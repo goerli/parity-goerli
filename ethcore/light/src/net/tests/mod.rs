@@ -87,6 +87,10 @@ impl IoContext for Expect {
 	fn persistent_peer_id(&self, _peer: PeerId) -> Option<NodeId> {
 		None
 	}
+
+	fn is_reserved_peer(&self, peer: PeerId) -> bool {
+		peer == 0xff
+	}
 }
 
 // can't implement directly for Arc due to cross-crate orphan rules.
@@ -146,7 +150,7 @@ impl Provider for TestProvider {
 
 	fn storage_proof(&self, req: request::CompleteStorageRequest) -> Option<request::StorageResponse> {
 		Some(StorageResponse {
-			proof: vec![::rlp::encode(&req.key_hash).into_vec()],
+			proof: vec![::rlp::encode(&req.key_hash)],
 			value: req.key_hash | req.address_hash,
 		})
 	}
@@ -190,6 +194,10 @@ fn write_handshake(status: &Status, capabilities: &Capabilities, proto: &LightPr
 	::net::status::write_handshake(status, capabilities, Some(&*flow_params))
 }
 
+fn write_free_handshake(status: &Status, capabilities: &Capabilities, proto: &LightProtocol) -> Vec<u8> {
+	::net::status::write_handshake(status, capabilities, Some(&proto.free_flow_params))
+}
+
 // helper for setting up the protocol handler and provider.
 fn setup(capabilities: Capabilities) -> (Arc<TestProviderInner>, LightProtocol) {
 	let provider = Arc::new(TestProviderInner {
@@ -229,6 +237,19 @@ fn handshake_expected() {
 	let packet_body = write_handshake(&status, &capabilities, &proto);
 
 	proto.on_connect(1, &Expect::Send(1, packet::STATUS, packet_body));
+}
+
+#[test]
+fn reserved_handshake_expected() {
+	let capabilities = capabilities();
+
+	let (provider, proto) = setup(capabilities);
+
+	let status = status(provider.client.chain_info());
+
+	let packet_body = write_free_handshake(&status, &capabilities, &proto);
+
+	proto.on_connect(0xff, &Expect::Send(0xff, packet::STATUS, packet_body));
 }
 
 #[test]

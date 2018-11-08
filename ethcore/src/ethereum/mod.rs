@@ -69,6 +69,8 @@ pub fn new_expanse<'a, T: Into<SpecParams<'a>>>(params: T) -> Spec {
 
 /// Create a new Musicoin mainnet chain spec.
 pub fn new_musicoin<'a, T: Into<SpecParams<'a>>>(params: T) -> Spec {
+	// The musicoin chain spec uses a block reward contract which can be found at
+	// https://gist.github.com/andresilva/6f2afaf9486732a0797f4bdeae018ee9
 	load(params.into(), include_bytes!("../../res/ethereum/musicoin.json"))
 }
 
@@ -87,9 +89,9 @@ pub fn new_social<'a, T: Into<SpecParams<'a>>>(params: T) -> Spec {
 	load(params.into(), include_bytes!("../../res/ethereum/social.json"))
 }
 
-/// Create a new Olympic testnet chain spec.
-pub fn new_olympic<'a, T: Into<SpecParams<'a>>>(params: T) -> Spec {
-	load(params.into(), include_bytes!("../../res/ethereum/olympic.json"))
+/// Create a new MIX mainnet chain spec.
+pub fn new_mix<'a, T: Into<SpecParams<'a>>>(params: T) -> Spec {
+	load(params.into(), include_bytes!("../../res/ethereum/mix.json"))
 }
 
 /// Create a new Morden testnet chain spec.
@@ -110,6 +112,11 @@ pub fn new_kovan<'a, T: Into<SpecParams<'a>>>(params: T) -> Spec {
 /// Create a new POA Sokol testnet chain spec.
 pub fn new_sokol<'a, T: Into<SpecParams<'a>>>(params: T) -> Spec {
 	load(params.into(), include_bytes!("../../res/ethereum/poasokol.json"))
+}
+
+/// Create a new Callisto chaun spec
+pub fn new_callisto<'a, T: Into<SpecParams<'a>>>(params: T) -> Spec {
+	load(params.into(), include_bytes!("../../res/ethereum/callisto.json"))
 }
 
 /// Create a new Goerli testnet chain spec.
@@ -156,6 +163,9 @@ pub fn new_frontier_test_machine() -> EthereumMachine { load_machine(include_byt
 
 /// Create a new Foundation Homestead-era chain spec as though it never changed from Frontier.
 pub fn new_homestead_test_machine() -> EthereumMachine { load_machine(include_bytes!("../../res/ethereum/homestead_test.json")) }
+
+/// Create a new Foundation Homestead-EIP210-era chain spec as though it never changed from Homestead/Frontier.
+pub fn new_eip210_test_machine() -> EthereumMachine { load_machine(include_bytes!("../../res/ethereum/eip210_test.json")) }
 
 /// Create a new Foundation Byzantium era spec.
 pub fn new_byzantium_test_machine() -> EthereumMachine { load_machine(include_bytes!("../../res/ethereum/byzantium_test.json")) }

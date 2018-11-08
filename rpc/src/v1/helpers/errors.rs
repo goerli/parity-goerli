@@ -26,6 +26,7 @@ use rlp::DecoderError;
 use transaction::Error as TransactionError;
 use ethcore_private_tx::Error as PrivateTransactionError;
 use vm::Error as VMError;
+use light::on_demand::error::{Error as OnDemandError, ErrorKind as OnDemandErrorKind};
 
 mod codes {
 	// NOTE [ToDr] Codes from [-32099, -32000]
@@ -34,6 +35,7 @@ mod codes {
 	pub const NO_AUTHOR: i64 = -32002;
 	pub const NO_NEW_WORK: i64 = -32003;
 	pub const NO_WORK_REQUIRED: i64 = -32004;
+	pub const CANNOT_SUBMIT_WORK: i64 = -32005;
 	pub const UNKNOWN_ERROR: i64 = -32009;
 	pub const TRANSACTION_ERROR: i64 = -32010;
 	pub const EXECUTION_ERROR: i64 = -32015;
@@ -50,6 +52,7 @@ mod codes {
 	pub const ENCODING_ERROR: i64 = -32058;
 	pub const FETCH_ERROR: i64 = -32060;
 	pub const NO_LIGHT_PEERS: i64 = -32065;
+	pub const NO_PEERS: i64 = -32066;
 	pub const DEPRECATED: i64 = -32070;
 }
 
@@ -196,6 +199,14 @@ pub fn no_work_required() -> Error {
 	}
 }
 
+pub fn cannot_submit_work(err: EthcoreError) -> Error {
+	Error {
+		code: ErrorCode::ServerError(codes::CANNOT_SUBMIT_WORK),
+		message: "Cannot submit work.".into(),
+		data: Some(Value::String(err.to_string())),
+	}
+}
+
 pub fn not_enough_data() -> Error {
 	Error {
 		code: ErrorCode::ServerError(codes::UNSUPPORTED_REQUEST),
@@ -273,6 +284,14 @@ pub fn signing(error: AccountError) -> Error {
 		code: ErrorCode::ServerError(codes::ACCOUNT_LOCKED),
 		message: "Your account is locked. Unlock the account via CLI, personal_unlockAccount or use Trusted Signer.".into(),
 		data: Some(Value::String(format!("{:?}", error))),
+	}
+}
+
+pub fn invalid_call_data<T: fmt::Display>(error: T) -> Error {
+	Error {
+		code: ErrorCode::ServerError(codes::ENCODING_ERROR),
+		message: format!("{}", error),
+		data: None
 	}
 }
 
@@ -444,7 +463,53 @@ pub fn filter_block_not_found(id: BlockId) -> Error {
 	}
 }
 
+pub fn on_demand_error(err: OnDemandError) -> Error {
+	match err {
+		OnDemandError(OnDemandErrorKind::ChannelCanceled(e), _) => on_demand_cancel(e),
+		OnDemandError(OnDemandErrorKind::MaxAttemptReach(_), _) => max_attempts_reached(&err),
+		OnDemandError(OnDemandErrorKind::TimeoutOnNewPeers(_,_), _) => timeout_new_peer(&err),
+		_ => on_demand_others(&err),
+	}
+}
+
 // on-demand sender cancelled.
 pub fn on_demand_cancel(_cancel: futures::sync::oneshot::Canceled) -> Error {
 	internal("on-demand sender cancelled", "")
 }
+
+pub fn max_attempts_reached(err: &OnDemandError) -> Error {
+	Error {
+		code: ErrorCode::ServerError(codes::REQUEST_NOT_FOUND),
+		message: err.to_string(),
+		data: None,
+	}
+}
+
+pub fn timeout_new_peer(err: &OnDemandError) -> Error {
+	Error {
+		code: ErrorCode::ServerError(codes::NO_LIGHT_PEERS),
+		message: err.to_string(),
+		data: None,
+	}
+}
+
+pub fn on_demand_others(err: &OnDemandError) -> Error {
+	Error {
+		code: ErrorCode::ServerError(codes::UNKNOWN_ERROR),
+		message: err.to_string(),
+		data: None,
+	}
+}
+
+pub fn status_error(has_peers: bool) -> Error {
+	if has_peers {
+		no_work()
+	} else {
+		Error {
+			code: ErrorCode::ServerError(codes::NO_PEERS),
+			message: "Node is not connected to any peers.".into(),
+			data: None,
+		}
+	}
+}
+
