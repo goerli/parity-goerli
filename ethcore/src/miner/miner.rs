@@ -50,7 +50,7 @@ use executive::contract_address;
 use header::{Header, BlockNumber};
 use miner;
 use miner::pool_client::{PoolClient, CachedNonceClient, NonceCache};
-use receipt::{Receipt, RichReceipt};
+use receipt::RichReceipt;
 use spec::Spec;
 use state::State;
 use ethkey::Password;
@@ -576,10 +576,9 @@ impl Miner {
 		trace!(target: "miner", "requires_reseal: sealing enabled");
 
 		// Disable sealing if there were no requests for SEALING_TIMEOUT_IN_BLOCKS
-		let had_requests = sealing.last_request.map(|last_request| {
-			best_block > last_request
-				&& best_block - last_request <= SEALING_TIMEOUT_IN_BLOCKS
-		}).unwrap_or(false);
+		let had_requests = sealing.last_request.map(|last_request| 
+			best_block.saturating_sub(last_request) <= SEALING_TIMEOUT_IN_BLOCKS
+		).unwrap_or(false);
 
 		// keep sealing enabled if any of the conditions is met
 		let sealing_enabled = self.forced_sealing()
@@ -938,6 +937,10 @@ impl miner::MinerService for Miner {
 		self.transaction_queue.all_transactions()
 	}
 
+	fn queued_transaction_hashes(&self) -> Vec<H256> {
+		self.transaction_queue.all_transaction_hashes()
+	}
+
 	fn pending_transaction_hashes<C>(&self, chain: &C) -> BTreeSet<H256> where
 		C: ChainInfo + Sync,
 	{
@@ -1039,19 +1042,17 @@ impl miner::MinerService for Miner {
 		self.transaction_queue.status()
 	}
 
-	fn pending_receipt(&self, best_block: BlockNumber, hash: &H256) -> Option<RichReceipt> {
+	fn pending_receipts(&self, best_block: BlockNumber) -> Option<Vec<RichReceipt>> {
 		self.map_existing_pending_block(|pending| {
-			let txs = pending.transactions();
-			txs.iter()
-				.map(|t| t.hash())
-				.position(|t| t == *hash)
-				.map(|index| {
-					let receipts = pending.receipts();
+			let receipts = pending.receipts();
+			pending.transactions()
+				.into_iter()
+				.enumerate()
+				.map(|(index, tx)| {
 					let prev_gas = if index == 0 { Default::default() } else { receipts[index - 1].gas_used };
-					let tx = &txs[index];
 					let receipt = &receipts[index];
 					RichReceipt {
-						transaction_hash: hash.clone(),
+						transaction_hash: tx.hash(),
 						transaction_index: index,
 						cumulative_gas_used: receipt.gas_used,
 						gas_used: receipt.gas_used - prev_gas,
@@ -1067,15 +1068,7 @@ impl miner::MinerService for Miner {
 						outcome: receipt.outcome.clone(),
 					}
 				})
-		}, best_block).and_then(|x| x)
-	}
-
-	fn pending_receipts(&self, best_block: BlockNumber) -> Option<BTreeMap<H256, Receipt>> {
-		self.map_existing_pending_block(|pending| {
-			let hashes = pending.transactions().iter().map(|t| t.hash());
-			let receipts = pending.receipts().iter().cloned();
-
-			hashes.zip(receipts).collect()
+				.collect()
 		}, best_block)
 	}
 
@@ -1398,6 +1391,33 @@ mod tests {
 		assert_eq!(miner.ready_transactions(&client, 10, PendingOrdering::Priority).len(), 1);
 		// This method will let us know if pending block was created (before calling that method)
 		assert_eq!(miner.prepare_pending_block(&client), BlockPreparationStatus::NotPrepared);
+	}
+
+	#[test]
+	fn should_not_return_stale_work_packages() {
+		// given
+		let client = TestBlockChainClient::default();
+		let miner = miner();
+
+		// initial work package should create the pending block
+		let res = miner.work_package(&client);
+		assert_eq!(res.unwrap().1, 1);
+		// This should be true, since there were some requests.
+		assert_eq!(miner.requires_reseal(0), true);
+
+		// when new block is imported
+		let client = generate_dummy_client(2);
+		let imported = [0.into()];
+		let empty = &[];
+		miner.chain_new_blocks(&*client, &imported, empty, &imported, empty, false);
+
+		// then
+		// This should be false, because it's too early.
+		assert_eq!(miner.requires_reseal(2), false);
+		// but still work package should be ready
+		let res = miner.work_package(&*client);
+		assert_eq!(res.unwrap().1, 3);
+		assert_eq!(miner.prepare_pending_block(&*client), BlockPreparationStatus::NotPrepared);
 	}
 
 	#[test]

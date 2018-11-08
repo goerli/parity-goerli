@@ -89,11 +89,12 @@ use ethcore::miner::{self, Miner, MinerService, pool_client::NonceCache};
 use ethcore::trace::{Tracer, VMTracer};
 use rustc_hex::FromHex;
 use ethkey::Password;
+use ethabi::FunctionOutputDecoder;
 
 // Source avaiable at https://github.com/parity-contracts/private-tx/blob/master/contracts/PrivateContract.sol
 const DEFAULT_STUB_CONTRACT: &'static str = include_str!("../res/private.evm");
 
-use_contract!(private, "PrivateContract", "res/private.json");
+use_contract!(private_contract, "res/private.json");
 
 /// Initialization vector length.
 const INIT_VEC_LEN: usize = 16;
@@ -219,7 +220,7 @@ impl Provider where {
 				let private_state_hash = self.calculate_state_hash(&private_state, contract_nonce);
 				trace!(target: "privatetx", "Hashed effective private state for sender: {:?}", private_state_hash);
 				self.transactions_for_signing.write().add_transaction(private.hash(), signed_transaction, contract_validators, private_state, contract_nonce)?;
-				self.broadcast_private_transaction(private.hash(), private.rlp_bytes().into_vec());
+				self.broadcast_private_transaction(private.hash(), private.rlp_bytes());
 				Ok(Receipt {
 					hash: tx_hash,
 					contract_address: Some(contract),
@@ -258,13 +259,13 @@ impl Provider where {
 			match transaction.validator_account {
 				None => {
 					trace!(target: "privatetx", "Propagating transaction further");
-					self.broadcast_private_transaction(private_hash, transaction.private_transaction.rlp_bytes().into_vec());
+					self.broadcast_private_transaction(private_hash, transaction.private_transaction.rlp_bytes());
 					return Ok(());
 				}
 				Some(validator_account) => {
 					if !self.validator_accounts.contains(&validator_account) {
 						trace!(target: "privatetx", "Propagating transaction further");
-						self.broadcast_private_transaction(private_hash, transaction.private_transaction.rlp_bytes().into_vec());
+						self.broadcast_private_transaction(private_hash, transaction.private_transaction.rlp_bytes());
 						return Ok(());
 					}
 					let tx_action = transaction.transaction.action.clone();
@@ -290,7 +291,7 @@ impl Provider where {
 						let signed_state = signed_state.expect("Error was checked before");
 						let signed_private_transaction = SignedPrivateTransaction::new(private_hash, signed_state, None);
 						trace!(target: "privatetx", "Sending signature for private transaction: {:?}", signed_private_transaction);
-						self.broadcast_signed_private_transaction(signed_private_transaction.hash(), signed_private_transaction.rlp_bytes().into_vec());
+						self.broadcast_signed_private_transaction(signed_private_transaction.hash(), signed_private_transaction.rlp_bytes());
 					} else {
 						bail!("Incorrect type of action for the transaction");
 					}
@@ -315,7 +316,7 @@ impl Provider where {
 		let desc = match self.transactions_for_signing.read().get(&private_hash) {
 			None => {
 				// Not our transaction, broadcast further to peers
-				self.broadcast_signed_private_transaction(signed_tx.hash(), signed_tx.rlp_bytes().into_vec());
+				self.broadcast_signed_private_transaction(signed_tx.hash(), signed_tx.rlp_bytes());
 				return Ok(());
 			},
 			Some(desc) => desc,
@@ -425,31 +426,23 @@ impl Provider where {
 	}
 
 	fn get_decrypted_state(&self, address: &Address, block: BlockId) -> Result<Bytes, Error> {
-		let contract = private::PrivateContract::default();
-		let state = contract.functions()
-			.state()
-			.call(&|data| self.client.call_contract(block, *address, data))
-			.map_err(|e| ErrorKind::Call(format!("Contract call failed {:?}", e)))?;
-
+		let (data, decoder) = private_contract::functions::state::call();
+		let value = self.client.call_contract(block, *address, data)?;
+		let state = decoder.decode(&value).map_err(|e| ErrorKind::Call(format!("Contract call failed {:?}", e)))?;
 		self.decrypt(address, &state)
 	}
 
 	fn get_decrypted_code(&self, address: &Address, block: BlockId) -> Result<Bytes, Error> {
-		let contract = private::PrivateContract::default();
-		let code = contract.functions()
-			.code()
-			.call(&|data| self.client.call_contract(block, *address, data))
-			.map_err(|e| ErrorKind::Call(format!("Contract call failed {:?}", e)))?;
-
-		self.decrypt(address, &code)
+		let (data, decoder) = private_contract::functions::code::call();
+		let value = self.client.call_contract(block, *address, data)?;
+		let state = decoder.decode(&value).map_err(|e| ErrorKind::Call(format!("Contract call failed {:?}", e)))?;
+		self.decrypt(address, &state)
 	}
 
 	pub fn get_contract_nonce(&self, address: &Address, block: BlockId) -> Result<U256, Error> {
-		let contract = private::PrivateContract::default();
-		Ok(contract.functions()
-			.nonce()
-			.call(&|data| self.client.call_contract(block, *address, data))
-			.map_err(|e| ErrorKind::Call(format!("Contract call failed {:?}", e)))?)
+		let (data, decoder) = private_contract::functions::nonce::call();
+		let value = self.client.call_contract(block, *address, data)?;
+		decoder.decode(&value).map_err(|e| ErrorKind::Call(format!("Contract call failed {:?}", e)).into())
 	}
 
 	fn snapshot_to_storage(raw: Bytes) -> HashMap<H256, H256> {
@@ -506,6 +499,7 @@ impl Provider where {
 			None => bail!(ErrorKind::ContractDoesNotExist),
 			Some(address) => {
 				let (code, storage) = state.into_account(&address)?;
+				trace!(target: "privatetx", "Private contract executed. code: {:?}, state: {:?}, result: {:?}", code, storage, result.output);
 				let enc_code = match code {
 					Some(c) => Some(self.encrypt(&address, &Self::iv_from_address(&address), &c)?),
 					None => None,
@@ -513,7 +507,6 @@ impl Provider where {
 				(enc_code, self.encrypt(&address, &Self::iv_from_transaction(transaction), &Self::snapshot_from_storage(&storage))?)
 			},
 		};
-		trace!(target: "privatetx", "Private contract executed. code: {:?}, state: {:?}, result: {:?}", encrypted_code, encrypted_storage, result.output);
 		Ok(PrivateExecutionResult {
 			code: encrypted_code,
 			state: encrypted_storage,
@@ -524,13 +517,11 @@ impl Provider where {
 
 	fn generate_constructor(validators: &[Address], code: Bytes, storage: Bytes) -> Bytes {
 		let constructor_code = DEFAULT_STUB_CONTRACT.from_hex().expect("Default contract code is valid");
-		let private = private::PrivateContract::default();
-		private.constructor(constructor_code, validators.iter().map(|a| *a).collect::<Vec<Address>>(), code, storage)
+		private_contract::constructor(constructor_code, validators.iter().map(|a| *a).collect::<Vec<Address>>(), code, storage)
 	}
 
 	fn generate_set_state_call(signatures: &[Signature], storage: Bytes) -> Bytes {
-		let private = private::PrivateContract::default();
-		private.functions().set_state().input(
+		private_contract::functions::set_state::encode_input(
 			storage,
 			signatures.iter().map(|s| {
 				let mut v: [u8; 32] = [0; 32];
@@ -604,11 +595,9 @@ impl Provider where {
 
 	/// Returns private validators for a contract.
 	pub fn get_validators(&self, block: BlockId, address: &Address) -> Result<Vec<Address>, Error> {
-		let contract = private::PrivateContract::default();
-		Ok(contract.functions()
-			.get_validators()
-			.call(&|data| self.client.call_contract(block, *address, data))
-			.map_err(|e| ErrorKind::Call(format!("Contract call failed {:?}", e)))?)
+		let (data, decoder) = private_contract::functions::get_validators::call();
+		let value = self.client.call_contract(block, *address, data)?;
+		decoder.decode(&value).map_err(|e| ErrorKind::Call(format!("Contract call failed {:?}", e)).into())
 	}
 }
 

@@ -224,17 +224,16 @@ pub fn check_proof(
 	}
 }
 
-/// Prove a transaction on the given state.
+/// Prove a `virtual` transaction on the given state.
 /// Returns `None` when the transacion could not be proved,
 /// and a proof otherwise.
-pub fn prove_transaction<H: AsHashDB<KeccakHasher> + Send + Sync>(
+pub fn prove_transaction_virtual<H: AsHashDB<KeccakHasher, DBValue> + Send + Sync>(
 	db: H,
 	root: H256,
 	transaction: &SignedTransaction,
 	machine: &Machine,
 	env_info: &EnvInfo,
 	factories: Factories,
-	virt: bool,
 ) -> Option<(Bytes, Vec<DBValue>)> {
 	use self::backend::Proving;
 
@@ -252,7 +251,7 @@ pub fn prove_transaction<H: AsHashDB<KeccakHasher> + Send + Sync>(
 	};
 
 	let options = TransactOptions::with_no_tracing().dont_check_nonce().save_output_from_contract();
-	match state.execute(env_info, machine, transaction, options, virt) {
+	match state.execute(env_info, machine, transaction, options, true) {
 		Err(ExecutionError::Internal(_)) => None,
 		Err(e) => {
 			trace!(target: "state", "Proved call failed: {}", e);
@@ -421,16 +420,7 @@ impl<B: Backend> State<B> {
 					**prev = checkpoint;
 				} else {
 					for (k, v) in checkpoint.drain() {
-						match prev.entry(k) {
-							Entry::Occupied(mut e) => {
-								if e.get().is_none() {
-									e.insert(v);
-								}
-							},
-							Entry::Vacant(e) => {
-								e.insert(v);
-							}
-						}
+						prev.entry(k).or_insert(v);
 					}
 				}
 			}
@@ -563,62 +553,70 @@ impl<B: Backend> State<B> {
 	}
 
 	/// Get the value of storage at a specific checkpoint.
-	pub fn checkpoint_storage_at(&self, checkpoint_index: usize, address: &Address, key: &H256) -> TrieResult<Option<H256>> {
+	pub fn checkpoint_storage_at(&self, start_checkpoint_index: usize, address: &Address, key: &H256) -> TrieResult<Option<H256>> {
+		#[must_use]
 		enum ReturnKind {
 			/// Use original storage at value at this address.
 			OriginalAt,
-			/// Use the downward checkpoint value.
-			Downward,
+			/// The checkpoint storage value is the same as the checkpoint storage value at the next checkpoint.
+			SameAsNext,
 		}
 
-		let (checkpoints_len, kind) = {
+		let kind = {
 			let checkpoints = self.checkpoints.borrow();
-			let checkpoints_len = checkpoints.len();
-			let checkpoint = match checkpoints.get(checkpoint_index) {
-				Some(checkpoint) => checkpoint,
+
+			if start_checkpoint_index >= checkpoints.len() {
 				// The checkpoint was not found. Return None.
-				None => return Ok(None),
-			};
+				return Ok(None);
+			}
 
-			let kind = match checkpoint.get(address) {
-				// The account exists at this checkpoint.
-				Some(Some(AccountEntry { account: Some(ref account), .. })) => {
-					if let Some(value) = account.cached_storage_at(key) {
-						return Ok(Some(value));
-					} else {
-						// This account has checkpoint entry, but the key is not in the entry's cache. We can use
-						// original_storage_at if current account's original storage root is the same as checkpoint
-						// account's original storage root. Otherwise, the account must be a newly created contract.
-						if account.base_storage_root() == self.original_storage_root(address)? {
-							ReturnKind::OriginalAt
+			let mut kind = None;
+
+			for checkpoint in checkpoints.iter().skip(start_checkpoint_index) {
+				match checkpoint.get(address) {
+					// The account exists at this checkpoint.
+					Some(Some(AccountEntry { account: Some(ref account), .. })) => {
+						if let Some(value) = account.cached_storage_at(key) {
+							return Ok(Some(value));
 						} else {
-							// If account base storage root is different from the original storage root since last
-							// commit, then it can only be created from a new contract, where the base storage root
-							// would always be empty. Note that this branch is actually never called, because
-							// `cached_storage_at` handled this case.
-							warn!("Trying to get an account's cached storage value, but base storage root does not equal to original storage root! Assuming the value is empty.");
-							return Ok(Some(H256::new()));
+							// This account has checkpoint entry, but the key is not in the entry's cache. We can use
+							// original_storage_at if current account's original storage root is the same as checkpoint
+							// account's original storage root. Otherwise, the account must be a newly created contract.
+							if account.base_storage_root() == self.original_storage_root(address)? {
+								kind = Some(ReturnKind::OriginalAt);
+								break
+							} else {
+								// If account base storage root is different from the original storage root since last
+								// commit, then it can only be created from a new contract, where the base storage root
+								// would always be empty. Note that this branch is actually never called, because
+								// `cached_storage_at` handled this case.
+								warn!(target: "state", "Trying to get an account's cached storage value, but base storage root does not equal to original storage root! Assuming the value is empty.");
+								return Ok(Some(H256::new()));
+							}
 						}
-					}
-				},
-				// The account didn't exist at that point. Return empty value.
-				Some(Some(AccountEntry { account: None, .. })) => return Ok(Some(H256::new())),
-				// The value was not cached at that checkpoint, meaning it was not modified at all.
-				Some(None) => ReturnKind::OriginalAt,
-				// This key does not have a checkpoint entry.
-				None => ReturnKind::Downward,
-			};
+					},
+					// The account didn't exist at that point. Return empty value.
+					Some(Some(AccountEntry { account: None, .. })) => return Ok(Some(H256::new())),
+					// The value was not cached at that checkpoint, meaning it was not modified at all.
+					Some(None) => {
+						kind = Some(ReturnKind::OriginalAt);
+						break
+					},
+					// This key does not have a checkpoint entry.
+					None => {
+						kind = Some(ReturnKind::SameAsNext);
+					},
+				}
+			}
 
-			(checkpoints_len, kind)
+			kind.expect("start_checkpoint_index is checked to be below checkpoints_len; for loop above must have been executed at least once; it will either early return, or set the kind value to Some; qed")
 		};
 
 		match kind {
-			ReturnKind::Downward => {
-				if checkpoint_index >= checkpoints_len - 1 {
-					Ok(Some(self.storage_at(address, key)?))
-				} else {
-					self.checkpoint_storage_at(checkpoint_index + 1, address, key)
-				}
+			ReturnKind::SameAsNext => {
+				// If we reached here, all previous SameAsNext failed to early return. It means that the value we want
+				// to fetch is the same as current.
+				Ok(Some(self.storage_at(address, key)?))
 			},
 			ReturnKind::OriginalAt => Ok(Some(self.original_storage_at(address, key)?)),
 		}
@@ -628,7 +626,7 @@ impl<B: Backend> State<B> {
 		&self, address: &Address, key: &H256, f_cached_at: FCachedStorageAt, f_at: FStorageAt,
 	) -> TrieResult<H256> where
 		FCachedStorageAt: Fn(&Account, &H256) -> Option<H256>,
-		FStorageAt: Fn(&Account, &HashDB<KeccakHasher>, &H256) -> TrieResult<H256>
+		FStorageAt: Fn(&Account, &HashDB<KeccakHasher, DBValue>, &H256) -> TrieResult<H256>
 	{
 		// Storage key search and update works like this:
 		// 1. If there's an entry for the account in the local cache check for the key and return it if found.
@@ -1024,7 +1022,7 @@ impl<B: Backend> State<B> {
 
 	/// Load required account data from the databases. Returns whether the cache succeeds.
 	#[must_use]
-	fn update_account_cache(require: RequireCache, account: &mut Account, state_db: &B, db: &HashDB<KeccakHasher>) -> bool {
+	fn update_account_cache(require: RequireCache, account: &mut Account, state_db: &B, db: &HashDB<KeccakHasher, DBValue>) -> bool {
 		if let RequireCache::None = require {
 			return true;
 		}
@@ -1153,6 +1151,8 @@ impl<B: Backend> State<B> {
 					if require_code {
 						let addr_hash = account.address_hash(a);
 						let accountdb = self.factories.accountdb.readonly(self.db.as_hashdb(), addr_hash);
+
+						// FIXME (Issue #9838): update_account_cache can fail in rare cases, but we cannot return error in RefMut wrapper.
 						Self::update_account_cache(RequireCache::Code, account, &self.db, accountdb.as_hashdb());
 					}
 					account
@@ -2460,6 +2460,52 @@ mod tests {
 		assert_eq!(state.storage_at(&a, &k).unwrap(), H256::from(U256::from(0)));
 		state.revert_to_checkpoint();
 		assert_eq!(state.storage_at(&a, &k).unwrap(), H256::from(U256::from(1)));
+	}
+
+	#[test]
+	fn create_contract_fail() {
+		let mut state = get_temp_state();
+		let orig_root = state.root().clone();
+		let a: Address = 1000.into();
+
+		state.checkpoint(); // c1
+		state.new_contract(&a, U256::zero(), U256::zero()).unwrap();
+		state.add_balance(&a, &U256::from(1), CleanupMode::ForceCreate).unwrap();
+		state.checkpoint(); // c2
+		state.add_balance(&a, &U256::from(1), CleanupMode::ForceCreate).unwrap();
+		state.discard_checkpoint(); // discard c2
+		state.revert_to_checkpoint(); // revert to c1
+		assert_eq!(state.exists(&a).unwrap(), false);
+
+		state.commit().unwrap();
+		assert_eq!(orig_root, state.root().clone());
+	}
+
+	#[test]
+	fn create_contract_fail_previous_storage() {
+		let mut state = get_temp_state();
+		let a: Address = 1000.into();
+		let k = H256::from(U256::from(0));
+
+		state.set_storage(&a, k, H256::from(U256::from(0xffff))).unwrap();
+		state.commit().unwrap();
+		state.clear();
+
+		let orig_root = state.root().clone();
+		assert_eq!(state.storage_at(&a, &k).unwrap(), H256::from(U256::from(0xffff)));
+		state.clear();
+
+		state.checkpoint(); // c1
+		state.new_contract(&a, U256::zero(), U256::zero()).unwrap();
+		state.checkpoint(); // c2
+		state.set_storage(&a, k, H256::from(U256::from(2))).unwrap();
+		state.revert_to_checkpoint(); // revert to c2
+		assert_eq!(state.storage_at(&a, &k).unwrap(), H256::from(U256::from(0)));
+		state.revert_to_checkpoint(); // revert to c1
+		assert_eq!(state.storage_at(&a, &k).unwrap(), H256::from(U256::from(0xffff)));
+
+		state.commit().unwrap();
+		assert_eq!(orig_root, state.root().clone());
 	}
 
 	#[test]

@@ -22,7 +22,7 @@ use std::sync::Arc;
 
 use hash::keccak;
 use ethcore::account_provider::AccountProvider;
-use ethcore::snapshot::{Progress, RestorationStatus, SnapshotService as SS};
+use ethcore::snapshot::{Progress, RestorationStatus, SnapshotConfiguration, SnapshotService as SS};
 use ethcore::snapshot::io::{SnapshotReader, PackedReader, PackedWriter};
 use ethcore::snapshot::service::Service as SnapshotService;
 use ethcore::client::{Mode, DatabaseCompactionProfile, VMType};
@@ -62,6 +62,8 @@ pub struct SnapshotCommand {
 	pub file_path: Option<String>,
 	pub kind: Kind,
 	pub block_at: BlockId,
+	pub max_round_blocks_to_import: usize,
+	pub snapshot_conf: SnapshotConfiguration,
 }
 
 // helper for reading chunks from arbitrary reader and feeding them into the
@@ -165,7 +167,7 @@ impl SnapshotCommand {
 		execute_upgrades(&self.dirs.base, &db_dirs, algorithm, &self.compaction)?;
 
 		// prepare client config
-		let client_config = to_client_config(
+		let mut client_config = to_client_config(
 			&self.cache_config,
 			spec.name.to_lowercase(),
 			Mode::Active,
@@ -178,7 +180,10 @@ impl SnapshotCommand {
 			self.pruning_history,
 			self.pruning_memory,
 			true,
+			self.max_round_blocks_to_import,
 		);
+
+		client_config.snapshot = self.snapshot_conf;
 
 		let restoration_db_handler = db::restoration_db_handler(&client_path, &client_config);
 		let client_db = restoration_db_handler.open(&client_path)

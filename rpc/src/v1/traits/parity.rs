@@ -22,12 +22,12 @@ use jsonrpc_core::{BoxFuture, Result};
 use jsonrpc_macros::Trailing;
 
 use v1::types::{
-	H160, H256, H512, U256, U64, Bytes, CallRequest,
+	H64, H160, H256, H512, U256, Bytes, CallRequest,
 	Peers, Transaction, RpcSettings, Histogram,
 	TransactionStats, LocalTransactionStatus,
 	BlockNumber, ConsensusCapability, VersionInfo,
 	OperationsInfo, ChainStatus,
-	AccountInfo, HwAccountInfo, RichHeader,
+	AccountInfo, HwAccountInfo, RichHeader, Receipt,
 };
 
 build_rpc_trait! {
@@ -148,6 +148,10 @@ build_rpc_trait! {
 		#[rpc(name = "parity_allTransactions")]
 		fn all_transactions(&self) -> Result<Vec<Transaction>>;
 
+		/// Same as parity_allTransactions, but return only transactions hashes.
+		#[rpc(name = "parity_allTransactionHashes")]
+		fn all_transaction_hashes(&self) -> Result<Vec<H256>>;
+
 		/// Returns all future transactions from transaction queue (deprecated)
 		#[rpc(name = "parity_futureTransactions")]
 		fn future_transactions(&self) -> Result<Vec<Transaction>>;
@@ -171,12 +175,6 @@ build_rpc_trait! {
 		/// Get the mode. Returns one of: "active", "passive", "dark", "offline".
 		#[rpc(name = "parity_mode")]
 		fn mode(&self) -> Result<String>;
-
-		/// Returns the chain ID used for transaction signing at the
-		/// current best block. None is returned if not
-		/// available.
-		#[rpc(name = "parity_chainId")]
-		fn chain_id(&self) -> Result<Option<U64>>;
 
 		/// Get the chain name. Returns one of the pre-configured chain names or a filename.
 		#[rpc(name = "parity_chain")]
@@ -211,6 +209,12 @@ build_rpc_trait! {
 		#[rpc(name = "parity_getBlockHeaderByNumber")]
 		fn block_header(&self, Trailing<BlockNumber>) -> BoxFuture<RichHeader>;
 
+		/// Get block receipts.
+		/// Allows you to fetch receipts from the entire block at once.
+		/// If no parameter is provided defaults to `latest`.
+		#[rpc(name = "parity_getBlockReceipts")]
+		fn block_receipts(&self, Trailing<BlockNumber>) -> BoxFuture<Vec<Receipt>>;
+
 		/// Get IPFS CIDv0 given protobuf encoded bytes.
 		#[rpc(name = "parity_cidV0")]
 		fn ipfs_cid(&self, Bytes) -> Result<String>;
@@ -218,5 +222,20 @@ build_rpc_trait! {
 		/// Call contract, returning the output data.
 		#[rpc(name = "parity_call")]
 		fn call(&self, Vec<CallRequest>, Trailing<BlockNumber>) -> Result<Vec<Bytes>>;
+
+		/// Used for submitting a proof-of-work solution (similar to `eth_submitWork`,
+		/// but returns block hash on success, and returns an explicit error message on failure).
+		#[rpc(name = "parity_submitWorkDetail")]
+		fn submit_work_detail(&self, H64, H256, H256) -> Result<H256>;
+
+		/// Returns the status of the node. Used as the health endpoint.
+		///
+		/// The RPC returns successful response if:
+		/// - The node have a peer (unless running a dev chain)
+		/// - The node is not syncing.
+		///
+		/// Otherwise the RPC returns error.
+		#[rpc(name = "parity_nodeStatus")]
+		fn status(&self) -> Result<()>;
 	}
 }

@@ -285,7 +285,7 @@ impl<'a> Runtime<'a> {
 		self.ext.set_storage(key, val).map_err(|_| Error::StorageUpdateError)?;
 
 		if former_val != H256::zero() && val == H256::zero() {
-			let sstore_clears_schedule = U256::from(self.schedule().sstore_refund_gas);
+			let sstore_clears_schedule = self.schedule().sstore_refund_gas;
 			self.ext.add_sstore_refund(sstore_clears_schedule);
 		}
 
@@ -450,7 +450,8 @@ impl<'a> Runtime<'a> {
 			&payload,
 			&address,
 			call_type,
-		);
+			false
+		).ok().expect("Trap is false; trap error will not happen; qed");
 
 		match call_result {
 			vm::MessageCallResult::Success(gas_left, data) => {
@@ -528,7 +529,7 @@ impl<'a> Runtime<'a> {
 			* U256::from(self.ext.schedule().wasm().opcodes_mul)
 			/ U256::from(self.ext.schedule().wasm().opcodes_div);
 
-		match self.ext.create(&gas_left, &endowment, &code, scheme) {
+		match self.ext.create(&gas_left, &endowment, &code, scheme, false).ok().expect("Trap is false; trap error will not happen; qed") {
 			vm::ContractCreateResult::Created(address, gas_left) => {
 				self.memory.set(result_ptr, &*address)?;
 				self.gas_counter = self.gas_limit -

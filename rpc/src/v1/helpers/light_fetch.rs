@@ -19,6 +19,7 @@
 use std::cmp;
 use std::sync::Arc;
 
+use light::on_demand::error::Error as OnDemandError;
 use ethcore::basic_account::BasicAccount;
 use ethcore::encoded;
 use ethcore::filter::Filter as EthcoreFilter;
@@ -44,12 +45,23 @@ use ethereum_types::{U256, Address};
 use hash::H256;
 use parking_lot::Mutex;
 use fastmap::H256FastMap;
-use transaction::{Action, Transaction as EthTransaction, SignedTransaction, LocalizedTransaction};
+use transaction::{Action, Transaction as EthTransaction, PendingTransaction, SignedTransaction, LocalizedTransaction};
 
 use v1::helpers::{CallRequest as CallRequestHelper, errors, dispatch};
 use v1::types::{BlockNumber, CallRequest, Log, Transaction};
 
-const NO_INVALID_BACK_REFS: &str = "Fails only on invalid back-references; back-references here known to be valid; qed";
+const NO_INVALID_BACK_REFS_PROOF: &str = "Fails only on invalid back-references; back-references here known to be valid; qed";
+
+const WRONG_RESPONSE_AMOUNT_TYPE_PROOF: &str = "responses correspond directly with requests in amount and type; qed";
+
+pub fn light_all_transactions(dispatch: &Arc<dispatch::LightDispatcher>) -> impl Iterator<Item=PendingTransaction> {
+	let txq = dispatch.transaction_queue.read();
+	let chain_info = dispatch.client.chain_info();
+
+	let current = txq.ready_transactions(chain_info.best_block_number, chain_info.best_block_timestamp);
+	let future = txq.future_transactions(chain_info.best_block_number, chain_info.best_block_timestamp);
+	current.into_iter().chain(future.into_iter())
+}
 
 /// Helper for fetching blockchain data either from the light client or the network
 /// as necessary.
@@ -148,7 +160,7 @@ impl LightFetch {
 		Either::B(self.send_requests(reqs, |res|
 			extract_header(&res, header_ref)
 				.expect("these responses correspond to requests that header_ref belongs to \
-						therefore it will not fail; qed")
+					therefore it will not fail; qed")
 		))
 	}
 
@@ -166,7 +178,7 @@ impl LightFetch {
 
 		Either::B(self.send_requests(reqs, |mut res| match res.pop() {
 			Some(OnDemandResponse::Code(code)) => code,
-			_ => panic!("responses correspond directly with requests in amount and type; qed"),
+			_ => panic!(WRONG_RESPONSE_AMOUNT_TYPE_PROOF),
 		}))
 	}
 
@@ -183,12 +195,12 @@ impl LightFetch {
 
 		Either::B(self.send_requests(reqs, |mut res|match res.pop() {
 			Some(OnDemandResponse::Account(acc)) => acc,
-			_ => panic!("responses correspond directly with requests in amount and type; qed"),
+			_ => panic!(WRONG_RESPONSE_AMOUNT_TYPE_PROOF),
 		}))
 	}
 
 	/// Helper for getting proved execution.
-	pub fn proved_execution(&self, req: CallRequest, num: Trailing<BlockNumber>) -> impl Future<Item = ExecutionResult, Error = Error> + Send {
+	pub fn proved_read_only_execution(&self, req: CallRequest, num: Trailing<BlockNumber>) -> impl Future<Item = ExecutionResult, Error = Error> + Send {
 		const DEFAULT_GAS_PRICE: u64 = 21_000;
 		// starting gas when gas not provided.
 		const START_GAS: u64 = 50_000;
@@ -247,19 +259,20 @@ impl LightFetch {
 		}).join(header_fut).and_then(move |((gas_known, tx), hdr)| {
 			// then request proved execution.
 			// TODO: get last-hashes from network.
-			let env_info = match client.env_info(id) {
+			let hash = hdr.hash();
+			let env_info = match client.env_info(BlockId::Hash(hash)) {
 				Some(env_info) => env_info,
 				_ => return Either::A(future::err(errors::unknown_block())),
 			};
 
-			Either::B(execute_tx(gas_known, ExecuteParams {
-				from: from,
-				tx: tx,
-				hdr: hdr,
-				env_info: env_info,
+			Either::B(execute_read_only_tx(gas_known, ExecuteParams {
+				from,
+				tx,
+				hdr,
+				env_info,
 				engine: client.engine().clone(),
-				on_demand: on_demand,
-				sync: sync,
+				on_demand,
+				sync,
 			}))
 		}))
 	}
@@ -276,7 +289,7 @@ impl LightFetch {
 
 		Either::B(self.send_requests(reqs, |mut res| match res.pop() {
 			Some(OnDemandResponse::Body(b)) => b,
-			_ => panic!("responses correspond directly with requests in amount and type; qed"),
+			_ => panic!(WRONG_RESPONSE_AMOUNT_TYPE_PROOF),
 		}))
 	}
 
@@ -292,7 +305,7 @@ impl LightFetch {
 
 		Either::B(self.send_requests(reqs, |mut res| match res.pop() {
 			Some(OnDemandResponse::Receipts(b)) => b,
-			_ => panic!("responses correspond directly with requests in amount and type; qed"),
+			_ => panic!(WRONG_RESPONSE_AMOUNT_TYPE_PROOF),
 		}))
 	}
 
@@ -322,7 +335,7 @@ impl LightFetch {
 							bit_combos.iter().any(|bloom| hdr_bloom.contains_bloom(bloom))
 						})
 						.map(|hdr| (hdr.number(), hdr.hash(), request::BlockReceipts(hdr.into())))
-						.map(|(num, hash, req)| on_demand.request(ctx, req).expect(NO_INVALID_BACK_REFS).map(move |x| (num, hash, x)))
+						.map(|(num, hash, req)| on_demand.request(ctx, req).expect(NO_INVALID_BACK_REFS_PROOF).map(move |x| (num, hash, x)))
 						.collect();
 
 					// as the receipts come in, find logs within them which match the filter.
@@ -351,10 +364,10 @@ impl LightFetch {
 									block_index += 1;
 								}
 							}
-							future::ok(matches)
+							future::ok::<_,OnDemandError>(matches)
 						}) // and then collect them into a vector.
 						.map(|matches| matches.into_iter().map(|(_, v)| v).collect())
-						.map_err(errors::on_demand_cancel)
+						.map_err(errors::on_demand_error)
 				});
 
 				match maybe_future {
@@ -379,7 +392,7 @@ impl LightFetch {
 			});
 
 			let eventual_index = match maybe_future {
-				Some(e) => e.expect(NO_INVALID_BACK_REFS).map_err(errors::on_demand_cancel),
+				Some(e) => e.expect(NO_INVALID_BACK_REFS_PROOF).map_err(errors::on_demand_error),
 				None => return Either::A(future::err(errors::network_disabled())),
 			};
 
@@ -429,9 +442,15 @@ impl LightFetch {
 	{
 		let maybe_future = self.sync.with_context(move |ctx| {
 			Box::new(self.on_demand.request_raw(ctx, reqs)
-					 .expect(NO_INVALID_BACK_REFS)
-					 .map(parse_response)
-					 .map_err(errors::on_demand_cancel))
+					 .expect(NO_INVALID_BACK_REFS_PROOF)
+					 .map_err(errors::on_demand_cancel)
+					 .and_then(|responses| {
+						 match responses {
+							 Ok(responses) => Ok(parse_response(responses)),
+							 Err(e) => Err(errors::on_demand_error(e)),
+						 }
+					 })
+			)
 		});
 
 		match maybe_future {
@@ -598,10 +617,10 @@ struct ExecuteParams {
 
 // has a peer execute the transaction with given params. If `gas_known` is false,
 // this will double the gas on each `OutOfGas` error.
-fn execute_tx(gas_known: bool, params: ExecuteParams) -> impl Future<Item = ExecutionResult, Error = Error> + Send {
+fn execute_read_only_tx(gas_known: bool, params: ExecuteParams) -> impl Future<Item = ExecutionResult, Error = Error> + Send {
 	if !gas_known {
 		Box::new(future::loop_fn(params, |mut params| {
-			execute_tx(true, params.clone()).and_then(move |res| {
+			execute_read_only_tx(true, params.clone()).and_then(move |res| {
 				match res {
 					Ok(executed) => {
 						// TODO: how to distinguish between actual OOG and
@@ -638,7 +657,7 @@ fn execute_tx(gas_known: bool, params: ExecuteParams) -> impl Future<Item = Exec
 			on_demand
 				.request(ctx, request)
 				.expect("no back-references; therefore all back-refs valid; qed")
-				.map_err(errors::on_demand_cancel)
+				.map_err(errors::on_demand_error)
 		});
 
 		match proved_future {
