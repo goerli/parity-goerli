@@ -27,13 +27,13 @@ matrix:
     - env: TARGET=x86_64-unknown-linux-gnu
       name: Sync Goerli Node
       rust: stable
-      script: $TRAVIS_BUILD_DIR/sync.sh
+      script: $TRAVIS_BUILD_DIR/scripts/sync.sh
 
     # GNU/Linux - Deploy Clique Network
     - env: TARGET=x86_64-unknown-linux-gnu
       name: Deploy Clique Network
       rust: stable
-      script: $TRAVIS_BUILD_DIR/clique.sh
+      script: $TRAVIS_BUILD_DIR/scripts/clique.sh
 
 cache:
   timeout: 600

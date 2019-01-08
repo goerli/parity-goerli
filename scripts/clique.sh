@@ -10,6 +10,7 @@ sudo apt install -y ethereum
 
 echo "________________________________________________________________________________"
 echo "BUILD PARITY: cargo build --features final"
+cd $TRAVIS_BUILD_DIR
 git clone https://github.com/jwasinger/parity-deploy -b clique /home/travis/build/goerli/parity-deploy
 ln -s /home/travis/build/goerli/parity-goerli /home/travis/build/goerli/parity-ethereum
 cd /home/travis/build/goerli/parity-goerli
