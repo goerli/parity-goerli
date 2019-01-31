@@ -80,6 +80,8 @@ pub enum Api {
 	/// Geth-compatible (best-effort) debug API (Potentially UNSAFE)
 	/// NOTE We don't aim to support all methods, only the ones that are useful.
 	Debug,
+	/// Clique (Safe)
+	Clique,
 }
 
 impl FromStr for Api {
@@ -106,6 +108,7 @@ impl FromStr for Api {
 			"signer" => Ok(Signer),
 			"traces" => Ok(Traces),
 			"web3" => Ok(Web3),
+			"clique" => Ok(Clique),
 			api => Err(format!("Unknown api: {}", api)),
 		}
 	}
@@ -189,6 +192,7 @@ fn to_modules(apis: &HashSet<Api>) -> BTreeMap<String, String> {
 			Api::Web3 => ("web3", "1.0"),
 			Api::Whisper => ("shh", "1.0"),
 			Api::WhisperPubSub => ("shh_pubsub", "1.0"),
+			Api::Clique => ("clique", "0.0.1")
 		};
 		modules.insert(name.into(), version.into());
 	}
@@ -447,6 +451,11 @@ impl FullDependencies {
 						PrivateClient::new(self.private_tx_service.as_ref().map(|p| p.provider()))
 							.to_delegate(),
 					);
+				}
+				Api::Clique => {
+					handler.extend_with(
+						
+					)
 				}
 			}
 		}
