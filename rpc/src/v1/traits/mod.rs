@@ -33,6 +33,7 @@ pub mod secretstore;
 pub mod signer;
 pub mod traces;
 pub mod web3;
+pub mod clique;
 
 pub use self::debug::Debug;
 pub use self::eth::{Eth, EthFilter};
@@ -51,3 +52,4 @@ pub use self::secretstore::SecretStore;
 pub use self::signer::Signer;
 pub use self::traces::Traces;
 pub use self::web3::Web3;
+pub use self::clique::Clique;

@@ -33,11 +33,10 @@ build_rpc_trait! {
 		#[rpc(name = "clique_getSnapshotAtHash")]
 		fn get_snapshot_at_hash(&self, H256) -> Result<Bytes>;
 
-
-		#[rpc(name = "clique_get_signers")]
+		#[rpc(name = "clique_getSigners")]
 		fn get_signers(&self, BlockNumber) -> Result<Bytes>;
 
-		#[rpc(name = "clique_get_signers_at_hash")]
+		#[rpc(name = "clique_getSignersAtHash")]
 		fn get_signers_at_hash(&self, H256) -> Result<Bytes>;
 
 		#[rpc(name = "clique_proposals")]

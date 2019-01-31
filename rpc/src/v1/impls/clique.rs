@@ -27,17 +27,74 @@ use jsonrpc_core::Result;
 use v1::helpers::errors;
 use v1::helpers::secretstore::{generate_document_key, encrypt_document,
 	decrypt_document, decrypt_document_with_shadow, ordered_servers_keccak};
+
+
 use v1::traits::SecretStore;
+use v1::traits::Clique;
+
 use v1::types::{H160, H256, H512, Bytes, EncryptedDocumentKey};
 use ethkey::Password;
 
+use ethcore::snapshot::{SnapshotService, RestorationStatus};
+
+
+
 /// Parity implementation.
-pub struct CliqueClient {
+pub struct CliqueClient<C, M, U> {
+	client: Arc<C>,
+	miner: Arc<M>,
+	updater: Arc<U>,
+	sync: Arc<SyncProvider>,
+	net: Arc<ManageNetwork>,
 	accounts: Arc<AccountProvider>,
+	logger: Arc<RotatingLogger>,
+	settings: Arc<NetworkSettings>,
+	signer: Option<Arc<SignerService>>,
+	ws_address: Option<Host>,
+	snapshot: Option<Arc<SnapshotService>>,
 }
 
-impl CliqueClient {
-    pub fn new(&self) -> Self {
+impl<C, M, U> CliqueClient<C, M, U> where
+	C: BlockChainClient,
+{
+	/// Creates new `ParityClient`.
+	pub fn new(
+		client: Arc<C>,
+		miner: Arc<M>,
+		sync: Arc<SyncProvider>,
+		updater: Arc<U>,
+		net: Arc<ManageNetwork>,
+		accounts: Arc<AccountProvider>,
+		logger: Arc<RotatingLogger>,
+		settings: Arc<NetworkSettings>,
+		signer: Option<Arc<SignerService>>,
+		ws_address: Option<Host>,
+		snapshot: Option<Arc<SnapshotService>>,
+	) -> Self {
+		CliqueClient {
+			client,
+			miner,
+			sync,
+			updater,
+			net,
+			accounts,
+			logger,
+			settings,
+			signer,
+			ws_address,
+			snapshot,
+		}
+	}
+}
+
+impl Clique for CliqueClient {
+    pub fn new() -> Self {
         
     }
+
+    fn get_snapshot(&self, BlockNumber: u32) -> Self {
+        self.snapshot.
+    }
+
+
 }
