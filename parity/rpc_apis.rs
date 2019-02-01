@@ -454,7 +454,7 @@ impl FullDependencies {
 				}
 				Api::Clique => {
 					handler.extend_with(
-						
+
 					)
 				}
 			}
@@ -712,6 +712,7 @@ impl ApiSet {
 			Api::Whisper,
 			Api::WhisperPubSub,
 			Api::Private,
+			Api::Clique,
 		]
 			.into_iter()
 			.cloned()
@@ -730,6 +731,17 @@ impl ApiSet {
 				public_list.insert(Api::ParityAccounts);
 				public_list
 			}
+			ApiSet::SafeContext => {
+				public_list.insert(Api::Debug);
+				public_list.insert(Api::Traces);
+				public_list.insert(Api::ParityPubSub);
+				public_list.insert(Api::ParityAccounts);
+				public_list.insert(Api::ParitySet);
+				public_list.insert(Api::Signer);
+				public_list.insert(Api::SecretStore);
+				public_list.insert(Api::Clique);
+				public_list
+			}
 			ApiSet::All => {
 				public_list.insert(Api::Debug);
 				public_list.insert(Api::Traces);
@@ -739,6 +751,7 @@ impl ApiSet {
 				public_list.insert(Api::Signer);
 				public_list.insert(Api::Personal);
 				public_list.insert(Api::SecretStore);
+				public_list.insert(Api::Clique);
 				public_list
 			}
 			ApiSet::PubSub => [
@@ -777,6 +790,7 @@ mod test {
 		assert_eq!(Api::Private, "private".parse().unwrap());
 		assert_eq!(Api::Whisper, "shh".parse().unwrap());
 		assert_eq!(Api::WhisperPubSub, "shh_pubsub".parse().unwrap());
+		assert_eq!(Api::Clique, "clique".parse().unwrap());
 		assert!("rp".parse::<Api>().is_err());
 	}
 
@@ -808,6 +822,7 @@ mod test {
 			Api::Whisper,
 			Api::WhisperPubSub,
 			Api::Private,
+			Api::Clique,
 		].into_iter()
 		.collect();
 		assert_eq!(ApiSet::UnsafeContext.list_apis(), expected);

@@ -40,61 +40,57 @@ use ethcore::snapshot::{SnapshotService, RestorationStatus};
 
 
 /// Parity implementation.
-pub struct CliqueClient<C, M, U> {
-	client: Arc<C>,
-	miner: Arc<M>,
-	updater: Arc<U>,
-	sync: Arc<SyncProvider>,
-	net: Arc<ManageNetwork>,
-	accounts: Arc<AccountProvider>,
-	logger: Arc<RotatingLogger>,
-	settings: Arc<NetworkSettings>,
-	signer: Option<Arc<SignerService>>,
-	ws_address: Option<Host>,
+pub struct CliqueClient {
 	snapshot: Option<Arc<SnapshotService>>,
 }
 
-impl<C, M, U> CliqueClient<C, M, U> where
-	C: BlockChainClient,
-{
+impl CliqueClient {
 	/// Creates new `ParityClient`.
 	pub fn new(
-		client: Arc<C>,
-		miner: Arc<M>,
-		sync: Arc<SyncProvider>,
-		updater: Arc<U>,
-		net: Arc<ManageNetwork>,
-		accounts: Arc<AccountProvider>,
-		logger: Arc<RotatingLogger>,
-		settings: Arc<NetworkSettings>,
-		signer: Option<Arc<SignerService>>,
-		ws_address: Option<Host>,
 		snapshot: Option<Arc<SnapshotService>>,
 	) -> Self {
 		CliqueClient {
-			client,
-			miner,
-			sync,
-			updater,
-			net,
-			accounts,
-			logger,
-			settings,
-			signer,
-			ws_address,
 			snapshot,
 		}
 	}
 }
 
 impl Clique for CliqueClient {
-    pub fn new() -> Self {
-        
+
+    pub fn new(
+		snapshot: Option<Arc<SnapshotService>>,
+	) -> Self {
+        CliqueClient {
+			snapshot
+		}
     }
 
-    fn get_snapshot(&self, BlockNumber: u32) -> Self {
-        self.snapshot.
-    }
+	fn get_snapshot(&self, BlockNumber) -> Result<()> {
+		let snaphsot = self.snapshot.
+	}
 
+	fn get_snapshot_at_hash(&self, H256) -> Result<()> {
+
+	}
+
+	fn get_signers(&self, BlockNumber) -> Result<()> {
+
+	}
+
+	fn get_signers_at_hash(&self, H256) -> Result<()> {
+
+	}
+
+	fn proposals(&self, BTreeSet<H512>) -> Result<()> {
+
+	}
+
+	fn propose(&self) -> Result<()> {
+
+	}
+
+	fn discard(&self, H160, Password, H256) -> Result<()> {
+		
+	}
 
 }
