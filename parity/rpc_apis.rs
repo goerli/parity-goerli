@@ -454,7 +454,9 @@ impl FullDependencies {
 				}
 				Api::Clique => {
 					handler.extend_with(
-
+						CliqueClient::new(
+							
+						)
 					)
 				}
 			}

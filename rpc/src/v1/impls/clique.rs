@@ -28,7 +28,7 @@ use v1::helpers::errors;
 use v1::helpers::secretstore::{generate_document_key, encrypt_document,
 	decrypt_document, decrypt_document_with_shadow, ordered_servers_keccak};
 
-
+use v1::ParityClient;
 use v1::traits::SecretStore;
 use v1::traits::Clique;
 
@@ -37,25 +37,12 @@ use ethkey::Password;
 
 use ethcore::snapshot::{SnapshotService, RestorationStatus};
 
-
-
-/// Parity implementation.
-pub struct CliqueClient {
-	snapshot: Option<Arc<SnapshotService>>,
-}
-
-impl CliqueClient {
-	/// Creates new `ParityClient`.
-	pub fn new(
-		snapshot: Option<Arc<SnapshotService>>,
-	) -> Self {
-		CliqueClient {
-			snapshot,
-		}
-	}
-}
-
-impl Clique for CliqueClient {
+impl<C, M, U, S> Clique for ParityClient<C, M, U> where
+	S: StateInfo + 'static,
+	C: miner::BlockChainClient + BlockChainClient + StateClient<State=S> + Call<State=S> + 'static,
+	M: MinerService<State=S> + 'static,
+	U: UpdateService + 'static,
+{
 
     pub fn new(
 		snapshot: Option<Arc<SnapshotService>>,
@@ -66,7 +53,7 @@ impl Clique for CliqueClient {
     }
 
 	fn get_snapshot(&self, BlockNumber) -> Result<()> {
-		let snaphsot = self.snapshot.
+		let snaphsot = self.snapshot.block_at
 	}
 
 	fn get_snapshot_at_hash(&self, H256) -> Result<()> {
