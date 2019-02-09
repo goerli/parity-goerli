@@ -43,16 +43,9 @@ impl<C, M, U, S> Clique for ParityClient<C, M, U> where
 	M: MinerService<State=S> + 'static,
 	U: UpdateService + 'static,
 {
+	fn get_snapshot(&self, blockNumber: BlockNumber) -> Result<()> {
+		let engine = self.client.engine()
 
-    pub fn new(
-		snapshot: Option<Arc<SnapshotService>>,
-	) -> Self {
-        CliqueClient {
-			snapshot
-		}
-    }
-
-	fn get_snapshot(&self, BlockNumber) -> Result<()> {
 		let snaphsot = self.snapshot.block_at
 	}
 
