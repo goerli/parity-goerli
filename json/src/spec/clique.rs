@@ -34,10 +34,13 @@ pub struct Clique {
 	pub params: CliqueParams,
 }
 
+// TODO: Tally type
+// TODO: Vote type
+// TODO: Snapshot type
+
 #[cfg(test)]
 mod tests {
 	use serde_json;
-	use uint::Uint;
 	use ethereum_types::U256;
 	use super::*;
 
