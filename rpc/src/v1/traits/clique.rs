@@ -21,8 +21,8 @@ use jsonrpc_derive::rpc;
 use std::collections::BTreeMap;
 use v1::types::{BlockNumber, H160, H256};
 
-type Snapshot = u8;      // TODO: Matching type for Snapshots seems to be missing
-type Address = H160;
+pub type Snapshot = u8;      // TODO: Matching type for Snapshots seems to be missing
+pub type Address = H160;
 
 /// Clique rpc interface.
 #[rpc]

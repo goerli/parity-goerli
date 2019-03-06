@@ -62,7 +62,7 @@ disable = false
 port = 8545
 interface = "local"
 cors = ["null"]
-apis = ["web3", "eth", "net", "parity", "traces", "rpc", "secretstore"]
+apis = ["web3", "eth", "net", "parity", "traces", "rpc", "secretstore", "clique"]
 hosts = ["none"]
 allow_missing_blocks = false
 
@@ -71,13 +71,13 @@ disable = false
 port = 8546
 interface = "local"
 origins = ["none"]
-apis = ["web3", "eth", "net", "parity", "traces", "rpc", "secretstore"]
+apis = ["web3", "eth", "net", "parity", "traces", "rpc", "secretstore", "clique"]
 hosts = ["none"]
 
 [ipc]
 disable = false
 path = "$HOME/.parity/jsonrpc.ipc"
-apis = ["web3", "eth", "net", "parity", "parity_accounts", "personal", "traces", "rpc", "secretstore"]
+apis = ["web3", "eth", "net", "parity", "parity_accounts", "personal", "traces", "rpc", "secretstore", "clique"]
 
 [dapps]
 disable = false

@@ -37,6 +37,7 @@ mod signing;
 mod signing_unsafe;
 mod traces;
 mod web3;
+mod clique;
 
 pub mod light;
 
@@ -63,3 +64,4 @@ pub use self::signing::SigningQueueClient;
 pub use self::signing_unsafe::SigningUnsafeClient;
 pub use self::traces::TracesClient;
 pub use self::web3::Web3Client;
+pub use self::clique::CliqueClient;
