@@ -18,7 +18,9 @@
 use jsonrpc_core::Result;
 use std::collections::BTreeMap;
 
-use v1::types::{H256, BlockNumber};
+use ethereum_types::H256;
+
+use v1::types::BlockNumber;
 use v1::traits::Clique;
 use v1::traits::clique::{Address, Snapshot};
 
