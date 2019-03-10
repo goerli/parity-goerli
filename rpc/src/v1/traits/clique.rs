@@ -19,41 +19,40 @@
 use jsonrpc_core::Result;
 use jsonrpc_derive::rpc;
 use std::collections::BTreeMap;
-use ethereum_types::{H160, H256};
 
-use v1::types::BlockNumber;
+use ethereum_types::{H256, Address};
 
-pub type Snapshot = u8;      // TODO: Matching type for Snapshots seems to be missing
-pub type Address = H160;
+use v1::types::{BlockNumber, Snapshot};
 
 /// Clique rpc interface.
 #[rpc]
 pub trait Clique {
-    // TODO: Doc
+    // retrieves the state snapshot at a given block.
     #[rpc(name = "clique_getSnapshot")]
     fn get_snapshot(&self, block_number: BlockNumber) -> Result<Snapshot>;
 
-    // TODO: Doc
+    // retrieves the state snapshot at a given hash.
     #[rpc(name = "clique_getSnapshotAtHash")]
     fn get_snapshot_at_hash(&self, hash: H256) -> Result<Snapshot>;
 
-    // TODO: Doc
+    // retrieves the list of authorized signers at the specified block.
     #[rpc(name = "clique_getSigners")]
     fn get_signers(&self, block_number: BlockNumber) -> Result<Vec<Address>>;
 
-    // TODO: Doc
+    // retrieves the list of authorized signers at the specified hash.
     #[rpc(name = "clique_getSignersAtHash")]
     fn get_signers_at_hash(&self, hash: H256) -> Result<Vec<Address>>;
 
-    // TODO: Doc
+    // returns the current proposals the node tries to uphold and vote on.
     #[rpc(name = "clique_proposals")]
     fn proposals(&self) -> Result<BTreeMap<Address, bool>>;
 
-    // TODO: Doc
+    // injects a new authorization proposal that the signer will attempt to push through.
     #[rpc(name = "clique_propose")]
     fn propose(&self, address: Address, auth: bool)-> Result<()>;
 
-    // TODO: Doc
+    // drops a currently running proposal, stopping the signer from casting
+	// further votes (either for or against).
     #[rpc(name = "clique_discard")]
     fn discard(&self, address: Address)-> Result<()>;
 }

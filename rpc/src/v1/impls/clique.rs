@@ -18,18 +18,18 @@
 use jsonrpc_core::Result;
 use std::collections::BTreeMap;
 
-use ethereum_types::H256;
-
-use v1::types::BlockNumber;
+use ethereum_types::{H256, Address};
 use v1::traits::Clique;
-use v1::traits::clique::{Address, Snapshot};
+use v1::types::{BlockNumber, Snapshot};
 
 /// Clique rpc implementation.
 pub struct CliqueClient;
 
 impl CliqueClient {
 	/// Creates new CliqueClient.
-	pub fn new() -> Self { CliqueClient }
+	pub fn new() -> Self {
+		CliqueClient
+	}
 }
 
 impl Clique for CliqueClient {
