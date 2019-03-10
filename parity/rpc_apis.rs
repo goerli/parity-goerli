@@ -453,6 +453,7 @@ impl FullDependencies {
 					);
 				}
 				Api::Clique => {
+					// TODO: Only extend if clique is running
 					handler.extend_with(CliqueClient::new().to_delegate())
 				}
 			}
@@ -674,6 +675,7 @@ impl<C: LightChainClient + 'static> LightDependencies<C> {
 					}
 				}
 				Api::Clique => {
+					// TODO: Only extend if clique is running
 					handler.extend_with(CliqueClient::new().to_delegate())
 				}
 			}
@@ -822,6 +824,7 @@ mod test {
 	fn test_api_set_ipc_context() {
 		let expected = vec![
 			// safe
+			Api::Clique,
 			Api::Web3,
 			Api::Net,
 			Api::Eth,
@@ -846,6 +849,7 @@ mod test {
 			"all".parse::<ApiSet>().unwrap(),
 			ApiSet::List(
 				vec![
+					Api::Clique,
 					Api::Web3,
 					Api::Net,
 					Api::Eth,
@@ -875,6 +879,7 @@ mod test {
 			"personal,all,-personal".parse::<ApiSet>().unwrap(),
 			ApiSet::List(
 				vec![
+					Api::Clique,
 					Api::Web3,
 					Api::Net,
 					Api::Eth,
@@ -903,6 +908,7 @@ mod test {
 			"safe".parse::<ApiSet>().unwrap(),
 			ApiSet::List(
 				vec![
+					Api::Clique,
 					Api::Web3,
 					Api::Net,
 					Api::Eth,
