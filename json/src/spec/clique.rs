@@ -34,10 +34,6 @@ pub struct Clique {
 	pub params: CliqueParams,
 }
 
-// TODO: Tally type
-// TODO: Vote type
-// TODO: Snapshot type
-
 #[cfg(test)]
 mod tests {
 	use serde_json;

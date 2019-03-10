@@ -32,7 +32,7 @@ fn eth_get_signers() {
 
 	let req_block = r#"{
 		"method":"clique_getSigners",
-		"params":[4],
+		"params":["0x4"],
 		"id":1,
 		"jsonrpc":"2.0"
 		}"#;

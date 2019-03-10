@@ -35,10 +35,10 @@ use parking_lot::Mutex;
 use jsonrpc_core::IoHandler;
 use v1::helpers::dispatch::{self, FullDispatcher};
 use v1::helpers::nonce;
-use v1::impls::{EthClient, EthClientOptions, SigningUnsafeClient};
+use v1::impls::{EthClient, EthClientOptions, SigningUnsafeClient, CliqueClient};
 use v1::metadata::Metadata;
 use v1::tests::helpers::{TestSnapshotService, TestSyncProvider, Config};
-use v1::traits::{Eth, EthSigning};
+use v1::traits::{Eth, EthSigning,Clique};
 
 fn account_provider() -> Arc<AccountProvider> {
 	Arc::new(AccountProvider::transient_provider())
@@ -155,6 +155,9 @@ impl EthTester {
 		let mut handler = IoHandler::default();
 		handler.extend_with(eth_client.to_delegate());
 		handler.extend_with(eth_sign.to_delegate());
+
+		// FIXME: This should depend on the configuration?
+		handler.extend_with(CliqueClient::new().to_delegate());
 
 		EthTester {
 			_miner: miner_service,
