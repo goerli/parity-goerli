@@ -52,6 +52,7 @@ pub struct Snapshot {
 	/// Authorized Signers
 	pub signers: HashSet<Address>,
 	/// Recent Signers (spam protection)
+	//FIXME: send a PR to Geth to correct the API typo (recents vs recent)
 	pub recents: BTreeMap<u64, Address>,
 	/// List of votes (chronologically sorted)
 	pub votes: Vec<Vote>,
