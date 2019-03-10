@@ -16,6 +16,7 @@
 
 //! Ethereum rpc interface implementation.
 
+mod clique;
 mod debug;
 mod eth;
 mod eth_filter;
@@ -37,10 +38,10 @@ mod signing;
 mod signing_unsafe;
 mod traces;
 mod web3;
-mod clique;
 
 pub mod light;
 
+pub use self::clique::CliqueClient;
 pub use self::debug::DebugClient;
 pub use self::eth::{EthClient, EthClientOptions};
 pub use self::eth_filter::EthFilterClient;
@@ -64,4 +65,3 @@ pub use self::signing::SigningQueueClient;
 pub use self::signing_unsafe::SigningUnsafeClient;
 pub use self::traces::TracesClient;
 pub use self::web3::Web3Client;
-pub use self::clique::CliqueClient;

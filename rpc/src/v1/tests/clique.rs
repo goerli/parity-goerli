@@ -16,5 +16,31 @@
 
 //! rpc integration tests for clique
 
+use ethjson::spec::ForkSpec;
+use v1::tests::eth_tester::EthTester;
+
 #[test]
-fn empty_test() { }
+fn empty_test() {
+	let a = 1;
+	println!("{}", a);
+}
+
+#[test]
+fn eth_get_signers() {
+	let chain = extract_chain!("BlockchainTests/bcGasPricerTest/RPC_API_Test");
+	let tester = EthTester::from_chain(&chain);
+
+	let req_block = r#"{
+		"method":"clique_getSigners",
+		"params":[4],
+		"id":1,
+		"jsonrpc":"2.0"
+		}"#;
+
+	let have = tester.handler.handle_request_sync(req_block).unwrap();
+
+	println!("{}", have);
+
+//	let want = "";
+//	assert_eq!(want, have);
+}

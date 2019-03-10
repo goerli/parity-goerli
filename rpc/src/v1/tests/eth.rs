@@ -16,166 +16,16 @@
 
 //! rpc integration tests.
 use std::env;
-use std::sync::Arc;
 
-use accounts::AccountProvider;
-use ethcore::client::{BlockChainClient, Client, ClientConfig, ChainInfo, ImportBlock};
-use ethcore::ethereum;
-use ethcore::miner::Miner;
-use ethcore::spec::{Genesis, Spec};
-use ethcore::test_helpers;
-use ethcore::verification::VerifierType;
+use ethcore::client::BlockChainClient;
+use ethcore::spec::Spec;
 use ethcore::verification::queue::kind::blocks::Unverified;
 use ethereum_types::{Address, H256, U256};
 use ethjson::blockchain::BlockChain;
 use ethjson::spec::ForkSpec;
-use io::IoChannel;
-use miner::external::ExternalMiner;
-use parity_runtime::Runtime;
-use parking_lot::Mutex;
 use types::ids::BlockId;
 
-use jsonrpc_core::IoHandler;
-use v1::helpers::dispatch::{self, FullDispatcher};
-use v1::helpers::nonce;
-use v1::impls::{EthClient, EthClientOptions, SigningUnsafeClient};
-use v1::metadata::Metadata;
-use v1::tests::helpers::{TestSnapshotService, TestSyncProvider, Config};
-use v1::traits::{Eth, EthSigning};
-
-fn account_provider() -> Arc<AccountProvider> {
-	Arc::new(AccountProvider::transient_provider())
-}
-
-fn sync_provider() -> Arc<TestSyncProvider> {
-	Arc::new(TestSyncProvider::new(Config {
-		network_id: 3,
-		num_peers: 120,
-	}))
-}
-
-fn miner_service(spec: &Spec) -> Arc<Miner> {
-	Arc::new(Miner::new_for_tests(spec, None))
-}
-
-fn snapshot_service() -> Arc<TestSnapshotService> {
-	Arc::new(TestSnapshotService::new())
-}
-
-fn make_spec(chain: &BlockChain) -> Spec {
-	let genesis = Genesis::from(chain.genesis());
-	let mut spec = ethereum::new_frontier_test();
-	let state = chain.pre_state.clone().into();
-	spec.set_genesis_state(state).expect("unable to set genesis state");
-	spec.overwrite_genesis_params(genesis);
-	assert!(spec.is_state_root_valid());
-	spec
-}
-
-struct EthTester {
-	_miner: Arc<Miner>,
-	_runtime: Runtime,
-	_snapshot: Arc<TestSnapshotService>,
-	accounts: Arc<AccountProvider>,
-	client: Arc<Client>,
-	handler: IoHandler<Metadata>,
-}
-
-impl EthTester {
-	fn from_chain(chain: &BlockChain) -> Self {
-
-		let tester = if ::ethjson::blockchain::Engine::NoProof == chain.engine {
-			let mut config = ClientConfig::default();
-			config.verifier_type = VerifierType::CanonNoSeal;
-			config.check_seal = false;
-			Self::from_spec_conf(make_spec(chain), config)
-		} else {
-			Self::from_spec(make_spec(chain))
-		};
-
-		for b in chain.blocks_rlp() {
-			if let Ok(block) = Unverified::from_rlp(b) {
-				let _ = tester.client.import_block(block);
-				tester.client.flush_queue();
-				tester.client.import_verified_blocks();
-			}
-		}
-
-		tester.client.flush_queue();
-
-		assert!(tester.client.chain_info().best_block_hash == chain.best_block.clone().into());
-		tester
-	}
-
-	fn from_spec(spec: Spec) -> Self {
-		let config = ClientConfig::default();
-		Self::from_spec_conf(spec, config)
-	}
-
-	fn from_spec_conf(spec: Spec, config: ClientConfig) -> Self {
-		let runtime = Runtime::with_thread_count(1);
-		let account_provider = account_provider();
-		let ap = account_provider.clone();
-		let accounts  = Arc::new(move || ap.accounts().unwrap_or_default()) as _;
-		let miner_service = miner_service(&spec);
-		let snapshot_service = snapshot_service();
-
-		let client = Client::new(
-			config,
-			&spec,
-			test_helpers::new_db(),
-			miner_service.clone(),
-			IoChannel::disconnected(),
-		).unwrap();
-		let sync_provider = sync_provider();
-		let external_miner = Arc::new(ExternalMiner::default());
-
-		let eth_client = EthClient::new(
-			&client,
-			&snapshot_service,
-			&sync_provider,
-			&accounts,
-			&miner_service,
-			&external_miner,
-			EthClientOptions {
-				pending_nonce_from_queue: false,
-				allow_pending_receipt_query: true,
-				send_block_number_in_get_work: true,
-				gas_price_percentile: 50,
-				allow_experimental_rpcs: true,
-				allow_missing_blocks: false
-			},
-		);
-
-		let reservations = Arc::new(Mutex::new(nonce::Reservations::new(runtime.executor())));
-
-		let dispatcher = FullDispatcher::new(client.clone(), miner_service.clone(), reservations, 50);
-		let signer = Arc::new(dispatch::Signer::new(account_provider.clone())) as _;
-		let eth_sign = SigningUnsafeClient::new(
-			&signer,
-			dispatcher,
-		);
-
-		let mut handler = IoHandler::default();
-		handler.extend_with(eth_client.to_delegate());
-		handler.extend_with(eth_sign.to_delegate());
-
-		EthTester {
-			_miner: miner_service,
-			_runtime: runtime,
-			_snapshot: snapshot_service,
-			accounts: account_provider,
-			client: client,
-			handler: handler,
-		}
-	}
-}
-
-#[test]
-fn harness_works() {
-	let chain: BlockChain = extract_chain!("BlockchainTests/bcWalletTest/wallet2outOf3txs");
-	let _ = EthTester::from_chain(&chain);
-}
+use v1::tests::eth_tester::EthTester;
 
 #[test]
 fn eth_get_balance() {
@@ -494,7 +344,7 @@ fn verify_transaction_counts(name: String, chain: BlockChain) {
 #[test]
 fn starting_nonce_test() {
 	let tester = EthTester::from_spec(Spec::load(&env::temp_dir(), POSITIVE_NONCE_SPEC).expect("invalid chain spec"));
-	let address = Address::from(10);
+	let address = Address::from(H256::from(10));
 
 	let sample = tester.handler.handle_request_sync(&(r#"
 		{

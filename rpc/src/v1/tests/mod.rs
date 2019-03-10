@@ -54,6 +54,8 @@ macro_rules! register_test {
 #[cfg(test)]
 mod mocked;
 #[cfg(test)]
+mod eth_tester;
+#[cfg(test)]
 mod eth;
 #[cfg(test)]
 mod clique;
