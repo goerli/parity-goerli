@@ -113,7 +113,8 @@ impl CliqueTester {
 	// This is generally used to fetch the state after a test has been executed and checked against
 	// the intial list of signers provided in the test
 	pub fn clique_signers(&self, hash: &H256) -> impl Iterator<Item=Address> {
-		self.clique.get_signers_at_hash(hash).unwrap().into_iter()
+		self.get_state_at_block(hash).signers().clone().into_iter()
+		// self.clique.get_signers_at_hash(hash).unwrap().into_iter()
 	}
 
 	/// Fetches all addresses at current `block` and converts them back to `tags (char)` and sorts them
@@ -721,7 +722,7 @@ fn unauthorized_signer_should_not_be_able_to_sign_block() {
 }
 
 #[test]
-fn signer_should_not_be_able_to_sign_two_consequtive_blocks() {
+fn signer_should_not_be_able_to_sign_two_consecutive_blocks() {
 	let tester = CliqueTester::with(3, 1, vec!['A', 'B']);
 	let b = tester.new_block_and_import(CliqueBlockType::Empty, &tester.genesis, None, 'A').unwrap();
 	let err = tester.new_block_and_import(CliqueBlockType::Empty, &b, None, 'A').unwrap_err();
@@ -801,3 +802,43 @@ fn bonus_consensus_should_keep_track_of_votes_before_latest_per_signer() {
 	let tags = tester.into_tags(tester.clique_signers(&vote.hash()));
 	assert_eq!(&tags, &['A', 'B', 'C', 'D', 'E']);
 }
+
+//////////////////////////////////////////////////////////////
+
+#[test]
+fn get_block_at_hash() {
+	let tester = CliqueTester::with(10, 1, vec!['A', 'B']);
+
+	// Add a vote for `C` signed by `A`
+	let b = tester.new_block_and_import(CliqueBlockType::Vote(VoteType::Add), &tester.genesis,
+										Some(tester.signers[&'C'].address()), 'A').unwrap();
+
+	// Empty block signed by `B`
+	let b = tester.new_block_and_import(CliqueBlockType::Empty, &b, None, 'B').unwrap();
+
+	// Add a vote for `D` signed by `A`
+	let b = tester.new_block_and_import(CliqueBlockType::Vote(VoteType::Add), &b,
+										Some(tester.signers[&'D'].address()), 'A').unwrap();
+
+	// Empty block signed by `B`
+	let b = tester.new_block_and_import(CliqueBlockType::Empty, &b, None, 'B').unwrap();
+
+	// Empty block signed by `A`
+	let b = tester.new_block_and_import(CliqueBlockType::Empty, &b, None, 'A').unwrap();
+
+	// Add a vote for `D` signed by `B`
+	let b = tester.new_block_and_import(CliqueBlockType::Vote(VoteType::Add), &b,
+										Some(tester.signers[&'D'].address()), 'B').unwrap();
+
+	// Empty block signed by `A`
+	let b = tester.new_block_and_import(CliqueBlockType::Empty, &b, None, 'A').unwrap();
+
+	// Add a vote for `C` signed by `B`
+	let b = tester.new_block_and_import(CliqueBlockType::Vote(VoteType::Add), &b,
+										Some(tester.signers[&'C'].address()), 'B').unwrap();
+
+	let tags = tester.into_tags(tester.clique_signers(&b.hash()));
+
+	assert_eq!(&tags, &['A', 'B', 'C', 'D']);
+}
+
