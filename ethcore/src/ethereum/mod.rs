@@ -169,6 +169,9 @@ pub fn new_constantinople_fix_test() -> Spec { load(None, include_bytes!("../../
 /// Create a new Musicoin-MCIP3-era spec.
 pub fn new_mcip3_test() -> Spec { load(None, include_bytes!("../../res/ethereum/mcip3_test.json")) }
 
+/// Create a new Goerli chain spec.
+pub fn new_goerli_test() -> Spec { load(None, include_bytes!("../../res/ethereum/goerli.json")) }
+
 // For tests
 
 /// Create a new Foundation Frontier-era chain spec as though it never changes to Homestead.

@@ -16,31 +16,175 @@
 
 //! rpc integration tests for clique
 
-use ethjson::spec::ForkSpec;
-use v1::tests::eth_tester::EthTester;
+#[cfg(test)]
+mod clique_tests {
+	use ethjson::spec::ForkSpec;
+	use v1::tests::eth_tester::EthTester;
+	use ethcore::ethereum;
 
-#[test]
-fn empty_test() {
-	let a = 1;
-	println!("{}", a);
-}
+	#[test]
+	fn clique_load_chain() {
+		let chain = extract_chain!("/../tests_local/CliqueGenesis");
+		let tester = EthTester::from_chain_spec(&chain, ethereum::new_goerli_test());
 
-#[test]
-fn eth_get_signers() {
-	let chain = extract_chain!("BlockchainTests/bcGasPricerTest/RPC_API_Test");
-	let tester = EthTester::from_chain(&chain);
+		assert_eq!("Clique", tester.client.engine().name());
+	}
 
-	let req_block = r#"{
+	#[test]
+	fn clique_other_engine() {
+		let chain = extract_chain!("BlockchainTests/bcGasPricerTest/RPC_API_Test");
+		let tester = EthTester::from_chain_spec(&chain, ethereum::new_frontier_test());
+
+		let req_block = r#"{
+		"method":"clique_getSnapshot",
+		"params":["0x4"],
+		"id":1,
+		"jsonrpc":"2.0"
+		}"#;
+
+		let have = tester.handler.handle_request_sync(req_block).unwrap_or_default();
+		assert!(have.contains("The node is not running a clique engine"));
+	}
+
+	#[test]
+	fn clique_get_snapshot() {
+		let chain = extract_chain!("/../tests_local/CliqueGenesis");
+		let tester = EthTester::from_chain_spec(&chain, ethereum::new_goerli_test());
+
+		let req_block = r#"{
+		"method":"clique_getSnapshot",
+		"params":["0x4"],
+		"id":1,
+		"jsonrpc":"2.0"
+		}"#;
+
+		let have = tester.handler.handle_request_sync(req_block).unwrap();
+
+		println!("{}", have);
+	}
+
+	#[test]
+	fn clique_get_snapshot_at_hash() {
+		// TODO: Fix/improve test
+
+		let chain = extract_chain!("/../tests_local/CliqueGenesis");
+		let tester = EthTester::from_chain_spec(&chain, ethereum::new_goerli_test());
+
+		let req_block = r#"{
+		"method":"clique_getSnapshotAtHash",
+		"params":["0x4"],
+		"id":1,
+		"jsonrpc":"2.0"
+		}"#;
+
+		let have = tester.handler.handle_request_sync(req_block).unwrap();
+
+		println!("{}", have);
+	}
+
+
+	#[test]
+	fn clique_get_signers() {
+		// TODO: Fix/improve test
+
+		let chain = extract_chain!("/../tests_local/CliqueGenesis");
+		let tester = EthTester::from_chain_spec(&chain, ethereum::new_goerli_test());
+
+		let req_block = r#"{
 		"method":"clique_getSigners",
 		"params":["0x4"],
 		"id":1,
 		"jsonrpc":"2.0"
 		}"#;
 
-	let have = tester.handler.handle_request_sync(req_block).unwrap();
+		let have = tester.handler.handle_request_sync(req_block).unwrap();
 
-	println!("{}", have);
+		println!("{}", have);
 
-//	let want = "";
-//	assert_eq!(want, have);
+		assert!(false);
+	}
+
+	#[test]
+	fn clique_get_signers_at_hash() {
+		// TODO: Fix/improve test
+
+		let chain = extract_chain!("/../tests_local/CliqueGenesis");
+		let tester = EthTester::from_chain_spec(&chain, ethereum::new_goerli_test());
+
+		let req_block = r#"{
+		"method":"clique_getSignersAtHash",
+		"params":["0x0000000000000000000000000000000000000000000000000000000000000234"],
+		"id":1,
+		"jsonrpc":"2.0"
+		}"#;
+
+		let have = tester.handler.handle_request_sync(req_block).unwrap();
+
+		println!("{}", have);
+
+		assert_eq!(have.contains("The node is not running a clique engine"), false);
+	}
+
+	#[test]
+	fn clique_proposals() {
+		// TODO: Fix/improve test
+
+		let chain = extract_chain!("/../tests_local/CliqueGenesis");
+		let tester = EthTester::from_chain_spec(&chain, ethereum::new_goerli_test());
+
+		let req_block = r#"{
+		"method":"clique_getSignersAtHash",
+		"params":["0x4"],
+		"id":1,
+		"jsonrpc":"2.0"
+		}"#;
+
+		let have = tester.handler.handle_request_sync(req_block).unwrap();
+
+		println!("{}", have);
+
+		assert!(false);
+	}
+
+	#[test]
+	fn clique_propose() {
+		// TODO: Fix/improve test
+
+		let chain = extract_chain!("/../tests_local/CliqueGenesis");
+		let tester = EthTester::from_chain_spec(&chain, ethereum::new_goerli_test());
+
+		let req_block = r#"{
+		"method":"clique_getSignersAtHash",
+		"params":["0x4"],
+		"id":1,
+		"jsonrpc":"2.0"
+		}"#;
+
+		let have = tester.handler.handle_request_sync(req_block).unwrap();
+
+		println!("{}", have);
+
+		assert!(false);
+	}
+
+	#[test]
+	fn clique_discard() {
+		// TODO: Fix/improve test
+
+		let chain = extract_chain!("/../tests_local/CliqueGenesis");
+		let tester = EthTester::from_chain_spec(&chain, ethereum::new_goerli_test());
+
+		let req_block = r#"{
+		"method":"clique_getSignersAtHash",
+		"params":["0x4"],
+		"id":1,
+		"jsonrpc":"2.0"
+		}"#;
+
+		let have = tester.handler.handle_request_sync(req_block).unwrap();
+
+		println!("{}", have);
+
+		assert!(false);
+	}
 }

@@ -58,6 +58,8 @@ use bytes::Bytes;
 use types::ancestry_action::AncestryAction;
 use block::ExecutedBlock;
 
+use downcast_rs::Downcast;
+
 /// Default EIP-210 contract code.
 /// As defined in https://github.com/ethereum/EIPs/pull/210
 pub const DEFAULT_BLOCKHASH_CONTRACT: &'static str = "73fffffffffffffffffffffffffffffffffffffffe33141561006a5760014303600035610100820755610100810715156100455760003561010061010083050761010001555b6201000081071515610064576000356101006201000083050761020001555b5061013e565b4360003512151561008457600060405260206040f361013d565b61010060003543031315156100a857610100600035075460605260206060f361013c565b6101006000350715156100c55762010000600035430313156100c8565b60005b156100ea576101006101006000350507610100015460805260206080f361013b565b620100006000350715156101095763010000006000354303131561010c565b60005b1561012f57610100620100006000350507610200015460a052602060a0f361013a565b600060c052602060c0f35b5b5b5b5b";
@@ -480,7 +482,7 @@ pub fn total_difficulty_fork_choice(new: &ExtendedHeader, best: &ExtendedHeader)
 // TODO: make this a _trait_ alias when those exist.
 // fortunately the effect is largely the same since engines are mostly used
 // via trait objects.
-pub trait EthEngine: Engine<::machine::EthereumMachine> {
+pub trait EthEngine: Engine<::machine::EthereumMachine> + Downcast {
 	/// Get the general parameters of the chain.
 	fn params(&self) -> &CommonParams {
 		self.machine().params()
@@ -559,8 +561,10 @@ pub trait EthEngine: Engine<::machine::EthereumMachine> {
 	}
 }
 
+impl_downcast!(EthEngine);
+
 // convenience wrappers for existing functions.
-impl<T> EthEngine for T where T: Engine<::machine::EthereumMachine> { }
+impl<T: 'static> EthEngine for T where T: Engine<::machine::EthereumMachine> { }
 
 /// Verifier for all blocks within an epoch with self-contained state.
 pub trait EpochVerifier<M: machine::Machine>: Send + Sync {

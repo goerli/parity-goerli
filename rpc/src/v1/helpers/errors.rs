@@ -60,6 +60,9 @@ mod codes {
 	pub const DEPRECATED: i64 = -32070;
 	pub const EXPERIMENTAL_RPC: i64 = -32071;
 	pub const CANNOT_RESTART: i64 = -32080;
+
+	// TODO: Find matching error code?
+	pub const NO_CLIQUE_ENGINE: i64 = -32081;
 }
 
 pub fn unimplemented(details: Option<String>) -> Error {
@@ -593,5 +596,13 @@ pub fn require_experimental(allow_experimental_rpcs: bool, eip: &str) -> Result<
 			message: format!("This method is not part of the official RPC API yet (EIP-{}). Run with `--jsonrpc-experimental` to enable it.", eip),
 			data: Some(Value::String(format!("See EIP: https://eips.ethereum.org/EIPS/eip-{}", eip))),
 		})
+	}
+}
+
+pub fn clique_not_running() -> Error {
+	Error {
+		code: ErrorCode::ServerError(codes::NO_CLIQUE_ENGINE),
+		message: format!("The node is not running a clique engine").into(),
+		data: None,
 	}
 }

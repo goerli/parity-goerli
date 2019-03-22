@@ -30,6 +30,8 @@ pub enum Engine {
 	Ethash,
 	/// No check of block's difficulty and nonce for tests.
 	NoProof,
+	/// Clique
+	Clique,
 }
 
 impl Default for Engine {

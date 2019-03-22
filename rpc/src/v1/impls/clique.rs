@@ -18,46 +18,77 @@
 use jsonrpc_core::Result;
 use std::collections::BTreeMap;
 
-use ethereum_types::{H256, Address};
+use ethereum_types::{H256, Address, H160};
 use v1::traits::Clique;
 use v1::types::{BlockNumber, Snapshot};
+use std::sync::Arc;
+use ethcore::client::EngineInfo;
+
+use v1::helpers::errors::clique_not_running;
 
 /// Clique rpc implementation.
-pub struct CliqueClient;
-
-impl CliqueClient {
-	/// Creates new CliqueClient.
-	pub fn new() -> Self {
-		CliqueClient
-	}
+pub struct CliqueClient<EI>
+{
+    engine_info: Arc<EI>,
 }
 
-impl Clique for CliqueClient {
-	fn get_snapshot(&self, block_number: BlockNumber) -> Result<Snapshot> {
-		unimplemented!()
-	}
+impl<EI> CliqueClient<EI> where EI: EngineInfo + Sync + Send {
+    /// Creates new CliqueClient.
+    pub fn new(engine_info: &Arc<EI>) -> Self {
+        CliqueClient {
+            engine_info: engine_info.clone(),
+        }
+    }
 
-	fn get_snapshot_at_hash(&self, hash: H256) -> Result<Snapshot> {
-		unimplemented!()
-	}
+    pub fn clique_engine(&self) -> Result<&ethcore::engines::Clique> {
+        let generic_engine = self.engine_info.engine();
+        return generic_engine.downcast_ref::<ethcore::engines::Clique>().ok_or_else(|| clique_not_running());
+    }
+}
 
-	fn get_signers(&self, block_number: BlockNumber) -> Result<Vec<Address>> {
-		unimplemented!()
-	}
+impl<EI: 'static> Clique for CliqueClient<EI> where EI: EngineInfo + Sync + Send {
+    fn get_snapshot(&self, block_number: BlockNumber) -> Result<Snapshot> {
+        let clique_engine = self.clique_engine()?;
 
-	fn get_signers_at_hash(&self, hash: H256) -> Result<Vec<Address>> {
-		unimplemented!()
-	}
+        unimplemented!()
+    }
 
-	fn proposals(&self) -> Result<BTreeMap<Address, bool>> {
-		unimplemented!()
-	}
+    fn get_snapshot_at_hash(&self, hash: H256) -> Result<Snapshot> {
+        let clique_engine = self.clique_engine()?;
 
-	fn propose(&self, address: Address, auth: bool) -> Result<()> {
-		unimplemented!()
-	}
+        unimplemented!()
+    }
 
-	fn discard(&self, address: Address) -> Result<()> {
-		unimplemented!()
-	}
+    fn get_signers(&self, block_number: BlockNumber) -> Result<Vec<Address>> {
+        let clique_engine = self.clique_engine()?;
+
+        unimplemented!()
+    }
+
+    fn get_signers_at_hash(&self, hash: H256) -> Result<Vec<Address>> {
+        let clique_engine = self.clique_engine()?;
+
+        let answer = clique_engine.get_signers_at_hash(hash);
+
+        let fake_answer = vec! {H160::from(H256::from(0))};
+        Ok(fake_answer)
+    }
+
+    fn proposals(&self) -> Result<BTreeMap<Address, bool>> {
+        let clique_engine = self.clique_engine()?;
+
+        unimplemented!()
+    }
+
+    fn propose(&self, address: Address, auth: bool) -> Result<()> {
+        let clique_engine = self.clique_engine()?;
+
+        unimplemented!()
+    }
+
+    fn discard(&self, address: Address) -> Result<()> {
+        let clique_engine = self.clique_engine()?;
+
+        unimplemented!()
+    }
 }

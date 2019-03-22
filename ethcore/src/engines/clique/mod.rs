@@ -60,6 +60,7 @@ use std::sync::{Arc, Weak};
 use std::thread;
 use std::time;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::iter::Iterator;
 
 use block::ExecutedBlock;
 use client::{BlockId, EngineClient};
@@ -173,6 +174,8 @@ pub struct Clique {
 	pub period: u64,
 	pub machine: EthereumMachine,
 	pub client: RwLock<Option<Weak<EngineClient>>>,
+
+	// TODO: Persist
 	pub block_state_by_hash: RwLock<LruCache<H256, CliqueBlockState>>,
 	pub proposals: RwLock<HashMap<Address, VoteType>>,
 	pub signer: RwLock<Option<Box<EngineSigner>>>,
@@ -237,9 +240,9 @@ impl Clique {
 		}
 	}
 
-	/// Construct an new state from given checkpoint header.
-	fn new_checkpoint_state(&self, header: &Header) -> Result<CliqueBlockState, Error> {
-		debug_assert_eq!(header.number() % self.epoch_length, 0);
+    /// Construct a new state from given checkpoint header.
+    fn new_checkpoint_state(&self, header: &Header) -> Result<CliqueBlockState, Error> {
+        debug_assert_eq!(header.number() % self.epoch_length, 0);
 
 		let mut state = CliqueBlockState::new(
 			extract_signers(header)?);
@@ -256,6 +259,8 @@ impl Clique {
 
 	/// Get `CliqueBlockState` for given header, backfill from last checkpoint if needed.
 	fn state(&self, header: &Header) -> Result<CliqueBlockState, Error> {
+		// TODO: Split and simplify this function. Allow retrieving by hash / block_number (keep private)
+
 		let mut block_state_by_hash = self.block_state_by_hash.write();
 		if let Some(state) = block_state_by_hash.get_mut(&header.hash()) {
 			return Ok(state.clone());
@@ -266,6 +271,7 @@ impl Clique {
 			block_state_by_hash.insert(header.hash(), state.clone());
 			return Ok(state);
 		}
+
 		// BlockState is not found in memory, which means we need to reconstruct state from last checkpoint.
 		match self.client.read().as_ref().and_then(|w| w.upgrade()) {
 			None => {
@@ -344,6 +350,19 @@ impl Clique {
 			}
 		}
 	}
+
+    pub fn get_signers_at_hash(&self, hash: &H256) -> Result<Vec<Address>, Error> {
+        // FIXME: Complete implementation
+        // TODO: Find corresponding header
+        let h = Header::default();
+
+        let tmp = self.state(&h);
+
+        let signers = extract_signers(&h)?;
+        let answer: Vec<Address> = signers.iter().map(|x| *x).collect();
+
+        Ok(answer)
+	}
 }
 
 impl Engine<EthereumMachine> for Clique {
@@ -375,34 +394,34 @@ impl Engine<EthereumMachine> for Clique {
 
 		let header = &mut block.header;
 
-		let state = self.state_no_backfill(header.parent_hash())
-			.ok_or_else(|| BlockError::UnknownParent(*header.parent_hash()))?;
+        let state = self.state_no_backfill(header.parent_hash())
+            .ok_or_else(|| BlockError::UnknownParent(*header.parent_hash()))?;
 
-		let is_checkpoint = header.number() % self.epoch_length == 0;
+        let is_checkpoint = header.number() % self.epoch_length == 0;
 
-		header.set_author(NULL_AUTHOR);
+        header.set_author(NULL_AUTHOR);
 
-		// cast an random Vote if not checkpoint
-		if !is_checkpoint {
-			// TODO(niklasad1): this will always be false because `proposals` is never written to
-			let votes = self.proposals.read().iter()
-				.filter(|(address, vote_type)| state.is_valid_vote(*address, **vote_type))
-				.map(|(address, vote_type)| (*address, *vote_type))
-				.collect_vec();
+        // cast an random Vote if not checkpoint
+        if !is_checkpoint {
+            // TODO(niklasad1): this will always be false because `proposals` is never written to
+            let votes = self.proposals.read().iter()
+                .filter(|(address, vote_type)| state.is_valid_vote(*address, **vote_type))
+                .map(|(address, vote_type)| (*address, *vote_type))
+                .collect_vec();
 
-			if !votes.is_empty() {
-				// Pick an random vote.
-				let random_vote = rand::thread_rng().gen_range(0 as usize, votes.len());
-				let (beneficiary, vote_type) = votes[random_vote];
+            if !votes.is_empty() {
+                // Pick an random vote.
+                let random_vote = rand::thread_rng().gen_range(0 as usize, votes.len());
+                let (beneficiary, vote_type) = votes[random_vote];
 
-				trace!(target: "engine", "Casting vote: beneficiary {}, type {:?} ", beneficiary, vote_type);
+                trace!(target: "engine", "Casting vote: beneficiary {}, type {:?} ", beneficiary, vote_type);
 
-				header.set_author(beneficiary);
-				header.set_seal(vote_type.as_rlp());
-			}
-		}
+                header.set_author(beneficiary);
+                header.set_seal(vote_type.as_rlp());
+            }
+        }
 
-		// Work on clique seal.
+        // Work on clique seal.
 
 		let mut seal: Vec<u8> = Vec::with_capacity(VANITY_LENGTH + SIGNATURE_LENGTH);
 
@@ -420,21 +439,21 @@ impl Engine<EthereumMachine> for Clique {
 		}
 
 		// If we are building an checkpoint block, add all signers now.
-		if is_checkpoint {
-			seal.reserve(state.signers().len() * 20);
-			state.signers().iter().foreach(|addr| {
-				seal.extend_from_slice(&addr[..]);
-			});
-		}
+        if is_checkpoint {
+            seal.reserve(state.signers().len() * 20);
+            state.signers().iter().foreach(|addr| {
+                seal.extend_from_slice(&addr[..]);
+            });
+        }
 
-		header.set_extra_data(seal.clone());
+        header.set_extra_data(seal.clone());
 
-		// append signature onto extra_data
-		let (sig, _msg) = self.sign_header(&header)?;
-		seal.extend_from_slice(&sig[..]);
-		header.set_extra_data(seal.clone());
+        // append signature onto extra_data
+        let (sig, _msg) = self.sign_header(&header)?;
+        seal.extend_from_slice(&sig[..]);
+        header.set_extra_data(seal.clone());
 
-		header.compute_hash();
+        header.compute_hash();
 
 		// locally sealed block don't go through valid_block_family(), so we have to record state here.
 		let mut new_state = state.clone();
@@ -442,15 +461,15 @@ impl Engine<EthereumMachine> for Clique {
 		new_state.calc_next_timestamp(header.timestamp(), self.period)?;
 		self.block_state_by_hash.write().insert(header.hash(), new_state);
 
-		trace!(target: "engine", "on_seal_block: finished, final header: {:?}", header);
+        trace!(target: "engine", "on_seal_block: finished, final header: {:?}", header);
 
 		Ok(())
 	}
 
-	/// Clique doesn't require external work to seal, so we always return true here.
-	fn seals_internally(&self) -> Option<bool> {
-		Some(true)
-	}
+    /// Clique doesn't require external work to seal, so we always return true here.
+    fn seals_internally(&self) -> Option<bool> {
+        Some(true)
+    }
 
 	/// Returns if we are ready to seal, the real sealing (signing extra_data) is actually done in `on_seal_block()`.
 	fn generate_seal(&self, block: &ExecutedBlock, parent: &Header) -> Seal {
