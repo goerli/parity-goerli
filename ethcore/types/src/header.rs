@@ -24,6 +24,8 @@ use bytes::Bytes;
 use rlp::{Rlp, RlpStream, Encodable, DecoderError, Decodable};
 use BlockNumber;
 
+use machine::WithMetadataHeader;
+
 /// Semantic boolean for when a seal/signature is included.
 #[derive(Debug, Clone, Copy)]
 enum Seal {
@@ -42,6 +44,8 @@ pub struct ExtendedHeader {
 	pub is_finalized: bool,
 	/// The parent block difficulty.
 	pub parent_total_difficulty: U256,
+	/// The block metadata information.
+	pub metadata: Option<Vec<u8>>,
 }
 
 /// A block header.
@@ -374,6 +378,11 @@ impl ExtendedHeader {
 		self.parent_total_difficulty + *self.header.difficulty()
 	}
 }
+
+impl WithMetadataHeader for ExtendedHeader {
+	fn metadata(&self) -> Option<&[u8]> { self.metadata.as_ref().map(|v| v.as_ref()) }
+}
+
 
 #[cfg(test)]
 mod tests {

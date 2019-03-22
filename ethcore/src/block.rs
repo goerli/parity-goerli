@@ -55,6 +55,8 @@ use types::transaction::{SignedTransaction, Error as TransactionError};
 use types::header::{Header, ExtendedHeader};
 use types::receipt::{Receipt, TransactionOutcome};
 
+use super::machine::WithMetadata;
+
 /// Block that is ready for transactions to be added.
 ///
 /// It's a bit like a Vec<Transaction>, except that whenever a transaction is pushed, we execute it and
@@ -72,6 +74,7 @@ pub struct OpenBlock<'x> {
 pub struct ClosedBlock {
 	block: ExecutedBlock,
 	unclosed_state: State<StateDB>,
+	unclosed_metadata: Option<Vec<u8>>,
 }
 
 /// Just like `ClosedBlock` except that we can't reopen it and it's faster.
@@ -108,6 +111,9 @@ pub struct ExecutedBlock {
 	pub traces: Tracing,
 	/// Hashes of last 256 blocks.
 	pub last_hashes: Arc<LastHashes>,
+	/// Block metadata.
+	pub metadata: Option<Vec<u8>>,
+
 }
 
 impl ExecutedBlock {
@@ -126,6 +132,7 @@ impl ExecutedBlock {
 				Tracing::Disabled
 			},
 			last_hashes: last_hashes,
+			metadata: None,
 		}
 	}
 
@@ -151,6 +158,16 @@ impl ExecutedBlock {
 	/// Get mutable reference to traces.
 	pub fn traces_mut(&mut self) -> &mut Tracing {
 		&mut self.traces
+	}
+}
+
+impl WithMetadata for ExecutedBlock {
+	fn metadata(&self) -> Option<&[u8]> {
+		self.metadata.as_ref().map(|v| v.as_ref())
+	}
+
+	fn set_metadata(&mut self, value: Option<Vec<u8>>) {
+		self.metadata = value;
 	}
 }
 
@@ -322,6 +339,7 @@ impl<'x> OpenBlock<'x> {
 			b
 		}));
 		s.block.header.set_gas_used(s.block.receipts.last().map_or_else(U256::zero, |r| r.gas_used));
+		s.block.set_metadata(self.block.get_metadata().clone());
 
 		Ok(LockedBlock {
 			block: s.block,

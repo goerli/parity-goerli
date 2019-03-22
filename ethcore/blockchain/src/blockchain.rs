@@ -466,6 +466,7 @@ impl<'a> Iterator for AncestryWithMetadataIter<'a> {
 						parent_total_difficulty: details.total_difficulty - *header.difficulty(),
 						is_finalized: details.is_finalized,
 						header,
+                        metadata: details.metadata,
 					})
 				},
 				_ => {
@@ -569,6 +570,7 @@ impl BlockChain {
 					parent: header.parent_hash(),
 					children: vec![],
 					is_finalized: false,
+                    metadata: None,
 				};
 
 				let mut batch = DBTransaction::new();
@@ -819,7 +821,7 @@ impl BlockChain {
 
 			self.prepare_update(batch, ExtrasUpdate {
 				block_hashes: self.prepare_block_hashes_update(&info),
-				block_details: self.prepare_block_details_update(block_parent_hash, &info, false),
+				block_details: self.prepare_block_details_update(block_parent_hash, &info, false, None),
 				block_receipts: self.prepare_block_receipts_update(receipts, &info),
 				blocks_blooms: self.prepare_block_blooms_update(block.header_view().log_bloom(), &info),
 				transactions_addresses: self.prepare_transaction_addresses_update(block.view().transaction_hashes(), &info),
@@ -851,6 +853,7 @@ impl BlockChain {
 				parent: block_parent_hash,
 				children: Vec::new(),
 				is_finalized: false,
+                metadata: None,
 			};
 
 			let mut update = HashMap::new();
@@ -1334,7 +1337,7 @@ impl BlockChain {
 
 	/// This function returns modified block details.
 	/// Uses the given parent details or attempts to load them from the database.
-	fn prepare_block_details_update(&self, parent_hash: H256, info: &BlockInfo, is_finalized: bool) -> HashMap<H256, BlockDetails> {
+	fn prepare_block_details_update(&self, parent_hash: H256, info: &BlockInfo, is_finalized: bool, metadata: Option<Vec<u8>>) -> HashMap<H256, BlockDetails> {
 		// update parent
 		let mut parent_details = self.block_details(&parent_hash).unwrap_or_else(|| panic!("Invalid parent hash: {:?}", parent_hash));
 		parent_details.children.push(info.hash);
@@ -1346,6 +1349,7 @@ impl BlockChain {
 			parent: parent_hash,
 			children: vec![],
 			is_finalized: is_finalized,
+            metadata: metadata,
 		};
 
 		// write to batch

@@ -156,15 +156,16 @@ pub struct BlockDetails {
 	pub children: Vec<H256>,
 	/// Whether the block is considered finalized
 	pub is_finalized: bool,
+    pub metadata: Option<Vec<u8>>
 }
 
 impl rlp::Encodable for BlockDetails {
 	fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-		let use_short_version = !self.is_finalized;
+		let use_short_version = !self.is_finalized && self.metadata.is_none();
 
 		match use_short_version {
 			true => { stream.begin_list(4); },
-			false => { stream.begin_list(5); },
+			false => { stream.begin_list(6); },
 		}
 
 		stream.append(&self.number);
@@ -173,6 +174,7 @@ impl rlp::Encodable for BlockDetails {
 		stream.append_list(&self.children);
 		if !use_short_version {
 			stream.append(&self.is_finalized);
+            stream.append(&self.metadata);
 		}
 	}
 }
@@ -194,6 +196,11 @@ impl rlp::Decodable for BlockDetails {
 				false
 			} else {
 				rlp.val_at(4)?
+			},
+			metadata: if use_short_version {
+				   None
+			} else {
+				   rlp.val_at(5)?
 			},
 		})
 	}

@@ -48,4 +48,6 @@ pub struct ExtrasInsert {
 	pub fork_choice: ForkChoice,
 	/// Is the inserted block considered finalized.
 	pub is_finalized: bool,
+	/// New block local metadata.
+	pub metadata: Option<Vec<u8>>,
 }

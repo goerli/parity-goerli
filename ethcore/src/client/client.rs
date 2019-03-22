@@ -498,7 +498,8 @@ impl Importer {
 		let new = ExtendedHeader {
 			header: header.clone(),
 			is_finalized,
-			parent_total_difficulty: chain.block_details(&parent).expect("Parent block is in the database; qed").total_difficulty
+			parent_total_difficulty: chain.block_details(&parent).expect("Parent block is in the database; qed").total_difficulty,
+            metadata: block.metadata,
 		};
 
 		let best = {
@@ -514,6 +515,7 @@ impl Importer {
 				parent_total_difficulty: details.total_difficulty - *header.difficulty(),
 				is_finalized: details.is_finalized,
 				header: header,
+                metadata: details.metadata,
 			}
 		};
 
@@ -2599,6 +2601,7 @@ mod tests {
 				another_client.chain.read().insert_block(&mut batch, encoded::Block::new(new_block), Vec::new(), ExtrasInsert {
 					fork_choice: ::engines::ForkChoice::New,
 					is_finalized: false,
+                    metadata: None,
 				});
 				go_thread.store(true, Ordering::SeqCst);
 			});
