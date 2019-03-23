@@ -45,9 +45,9 @@ pub struct Tally {
 #[derive(Debug, Default, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
-	// Block number
+	/// Block number
 	pub number: u64,
-	// Block hash
+	/// Block hash
 	pub hash: H256,
 	/// Authorized Signers
 	pub signers: HashSet<Address>,

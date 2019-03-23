@@ -54,7 +54,7 @@
 ///    the new block.
 
 use std::cmp;
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 use std::collections::VecDeque;
 use std::sync::{Arc, Weak};
 use std::thread;
@@ -370,10 +370,37 @@ impl Clique {
 		Ok(header)
 	}
 
-	pub fn get_state(&self, query: BlockId) -> Result<CliqueBlockState, Error> {
+	pub fn get_snapshot(&self, query: BlockId) -> Result<::engines::Snapshot, Error> {
 		let header = self.find_header(query)?;
 		let state = self.state(&header)?;
-		Ok(state)
+
+		let recents = state.recent_signers().iter().map(|x| {
+			// TODO(jleni): What is the key?
+			(0u64, *x)
+		}).collect();
+
+		let votes = state.votes().iter().map(|x| {
+			types::engines::Vote {
+				signer: x.signer,
+				block: x.block_number,
+				address: x.beneficiary,
+				authorize: x.kind == VoteType::Add,
+			}
+		}).collect();
+
+		// FIXME(jleni): need conversion here
+		let tally = BTreeMap::new();
+
+		let answer = types::engines::Snapshot {
+			number: header.number(),
+			hash: header.hash(),
+			signers: state.signers().iter().map(|x| *x).collect(),
+			recents,
+			votes,
+			tally,
+		};
+
+		Ok(answer)
 	}
 
 	pub fn get_signers(&self, query: BlockId) -> Result<Vec<Address>, Error> {
@@ -384,7 +411,7 @@ impl Clique {
 	}
 }
 
-	impl Engine<EthereumMachine> for Clique {
+impl Engine<EthereumMachine> for Clique {
 	fn name(&self) -> &str { "Clique" }
 
 	fn machine(&self) -> &EthereumMachine { &self.machine }

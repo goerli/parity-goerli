@@ -17,13 +17,13 @@
 //! clique rpc implementation.
 use jsonrpc_core::Result;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
+use ethcore::client::{EngineInfo, BlockId};
 use ethereum_types::{H256, Address};
+
 use v1::traits::Clique;
 use v1::types::{BlockNumber, Snapshot};
-use std::sync::Arc;
-use ethcore::client::{EngineInfo, BlockId};
-
 use v1::helpers::errors::{clique_not_running, unimplemented};
 
 /// Clique rpc implementation.
@@ -46,19 +46,16 @@ impl<EI> CliqueClient<EI> where EI: EngineInfo + Sync + Send {
 	}
 }
 
-fn snapshot_from(header: types::header::Header, state: CliqueBlockState) -> Result<Snapshot> {
-	// FIXME(jleni): Use correct errors
-	// let number = header.number.ok_or(unimplemented(None))? as u64;
-	let number = 0;
-	let hash = header.hash();
-	let signers = state.signers.iter().map(|x| *x).collect();
-	let recents = state.recent_signers.iter().map(|x| *x).collect();
-
-	// FIXME(jleni):
-	let votes = state.votes_history;
-	let tally = BTreeMap::new();
-
-	Ok(Snapshot { number, hash, signers, recents, votes, tally })
+fn snapshot_from(s: ethcore::engines::Snapshot) -> Result<Snapshot> {
+	// TODO: Convert votes / tally
+	Ok(Snapshot{
+		number: s.number,
+		hash: s.hash,
+		signers: s.signers,
+		recents: s.recents,
+		votes: s.votes,
+		tally: s.tally
+	})
 }
 
 fn block_number_to_query(bn: BlockNumber) -> Result<BlockId> {
@@ -80,11 +77,8 @@ impl<EI: 'static> Clique for CliqueClient<EI> where EI: EngineInfo + Sync + Send
 		let query = block_number_to_query(block_number)?;
 
 		// FIXME(jleni): Improve this
-//		let state = clique_engine.get_state(query).or_else(unimplemented(None))?;
-		let state = clique_engine.get_state(query)?;
-		let header = clique_engine.find_header(query)?;
-
-		Ok(snapshot_from(header, state)?)
+		let snapshot = clique_engine.get_snapshot(query)?;
+		Ok(snapshot_from(snapshot)?)
 	}
 
 	fn get_snapshot_at_hash(&self, hash: H256) -> Result<Snapshot> {
@@ -92,15 +86,11 @@ impl<EI: 'static> Clique for CliqueClient<EI> where EI: EngineInfo + Sync + Send
 		let query = hash_to_query(hash)?;
 
 		// FIXME(jleni): Improve this
-		let state = clique_engine.get_state(query).or_else(unimplemented(None))?;
-		let header = clique_engine.find_header(query)?;
-
-		Ok(snapshot_from(header, state)?)
+		let snapshot = clique_engine.get_snapshot(query)?;
+		Ok(snapshot_from(snapshot)?)
 	}
 
 	fn get_signers(&self, block_number: BlockNumber) -> Result<Vec<Address>> {
-//		let query = BlockId::Number(block_number);
-//		let query = BlockId::Hash(*hash);
 		let clique_engine = self.clique_engine()?;
 		let query = block_number_to_query(block_number)?;
 		let answer = clique_engine.get_signers(query).or_else(unimplemented(None))?;

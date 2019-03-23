@@ -35,6 +35,7 @@ pub use self::clique::Clique;
 
 // TODO [ToDr] Remove re-export (#10130)
 pub use types::engines::ForkChoice;
+pub use types::engines::Snapshot;
 pub use types::engines::epoch::{self, Transition as EpochTransition};
 
 use std::sync::{Weak, Arc};
