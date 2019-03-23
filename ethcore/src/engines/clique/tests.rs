@@ -112,7 +112,7 @@ impl CliqueTester {
 	/// Get signers after a certain state
 	// This is generally used to fetch the state after a test has been executed and checked against
 	// the intial list of signers provided in the test
-	pub fn clique_signers(&self, hash: &H256) -> impl Iterator<Item=Address> {
+	pub fn clique_signers(&self, hash: &H256) -> impl Iterator<Item = Address> {
 		self.get_state_at_block(hash).signers().clone().into_iter()
 		// self.clique.get_signers_at_hash(hash).unwrap().into_iter()
 	}
@@ -120,7 +120,7 @@ impl CliqueTester {
 	/// Fetches all addresses at current `block` and converts them back to `tags (char)` and sorts them
 	/// Addresses are supposed sorted based on address but these tests are using `tags` just for simplicity
 	/// and the order is not important!
-	pub fn into_tags<T: Iterator<Item=Address>>(&self, addr: T) -> Vec<char> {
+	pub fn into_tags<T: Iterator<Item = Address>>(&self, addr: T) -> Vec<char> {
 		let mut tags: Vec<char> = addr.filter_map(|addr| {
 			for (t, kp) in self.signers.iter() {
 				if addr == kp.address() {

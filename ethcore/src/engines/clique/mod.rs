@@ -347,23 +347,6 @@ impl Clique {
 		Ok(new_state)
 	}
 
-	// TODO(jleni): Move Snapshot type here
-	// TODO(jleni): Directly return snapshots (they include state + block_number + hash)
-//	fn snapshot_from(header: types::header::Header, state: CliqueBlockState) -> Result<Snapshot> {
-//		// FIXME(jleni): Use correct errors
-//		// let number = header.number.ok_or(unimplemented(None))? as u64;
-//		let number = 0;
-//		let hash = header.hash();
-//		let signers = state.signers.iter().map(|x| *x).collect();
-//		let recents = state.recent_signers.iter().map(|x| *x).collect();
-//
-//		// FIXME(jleni):
-//		let votes = state.votes_history;
-//		let tally = BTreeMap::new();
-//
-//		Ok(Snapshot { number, hash, signers, recents, votes, tally })
-//	}
-
 	pub fn find_header(&self, query: BlockId) -> Result<Header, Error> {
 		let client = self.client.read().as_ref().and_then(|w| w.upgrade()).ok_or(EngineError::RequiresClient)?;
 		let header = client.block_header(query).ok_or_else(|| "block not found")?.decode()?;

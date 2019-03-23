@@ -48,13 +48,16 @@ impl<EI> CliqueClient<EI> where EI: EngineInfo + Sync + Send {
 
 fn snapshot_from(s: ethcore::engines::Snapshot) -> Result<Snapshot> {
 	// TODO: Convert votes / tally
-	Ok(Snapshot{
+	let votes = vec![];
+	let tally = BTreeMap::new();
+
+	Ok(Snapshot {
 		number: s.number,
 		hash: s.hash,
 		signers: s.signers,
 		recents: s.recents,
-		votes: s.votes,
-		tally: s.tally
+		votes,
+		tally,
 	})
 }
 
@@ -77,30 +80,30 @@ impl<EI: 'static> Clique for CliqueClient<EI> where EI: EngineInfo + Sync + Send
 		let query = block_number_to_query(block_number)?;
 
 		// FIXME(jleni): Improve this
-		let snapshot = clique_engine.get_snapshot(query)?;
+		let snapshot = clique_engine.get_snapshot(query).map_err(|_| unimplemented(None))?;
 		Ok(snapshot_from(snapshot)?)
 	}
 
 	fn get_snapshot_at_hash(&self, hash: H256) -> Result<Snapshot> {
 		let clique_engine = self.clique_engine()?;
-		let query = hash_to_query(hash)?;
+		let query = hash_to_query(hash).map_err(|_| unimplemented(None))?;
 
 		// FIXME(jleni): Improve this
-		let snapshot = clique_engine.get_snapshot(query)?;
+		let snapshot = clique_engine.get_snapshot(query).map_err(|_| unimplemented(None))?;
 		Ok(snapshot_from(snapshot)?)
 	}
 
 	fn get_signers(&self, block_number: BlockNumber) -> Result<Vec<Address>> {
 		let clique_engine = self.clique_engine()?;
 		let query = block_number_to_query(block_number)?;
-		let answer = clique_engine.get_signers(query).or_else(unimplemented(None))?;
+		let answer = clique_engine.get_signers(query).map_err(|_| unimplemented(None))?;
 		Ok(answer)
 	}
 
 	fn get_signers_at_hash(&self, hash: H256) -> Result<Vec<Address>> {
 		let clique_engine = self.clique_engine()?;
 		let query = hash_to_query(hash)?;
-		let answer = clique_engine.get_signers(query).or_else(unimplemented(None))?;
+		let answer = clique_engine.get_signers(query).map_err(|_| unimplemented(None))?;
 		Ok(answer)
 	}
 
