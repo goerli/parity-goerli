@@ -34,7 +34,7 @@ pub use self::signer::EngineSigner;
 pub use self::clique::Clique;
 
 // TODO [ToDr] Remove re-export (#10130)
-pub use types::engines::ForkChoice;
+pub use types::engines::{ForkChoice,Snapshot};
 pub use types::engines::epoch::{self, Transition as EpochTransition};
 
 use std::sync::{Weak, Arc};
@@ -57,6 +57,8 @@ use unexpected::{Mismatch, OutOfBounds};
 use bytes::Bytes;
 use types::ancestry_action::AncestryAction;
 use block::ExecutedBlock;
+
+use downcast_rs::Downcast;
 
 /// Default EIP-210 contract code.
 /// As defined in https://github.com/ethereum/EIPs/pull/210
@@ -478,7 +480,7 @@ pub fn total_difficulty_fork_choice(new: &ExtendedHeader, best: &ExtendedHeader)
 // TODO: make this a _trait_ alias when those exist.
 // fortunately the effect is largely the same since engines are mostly used
 // via trait objects.
-pub trait EthEngine: Engine<::machine::EthereumMachine> {
+pub trait EthEngine: Engine<::machine::EthereumMachine> + Downcast {
 	/// Get the general parameters of the chain.
 	fn params(&self) -> &CommonParams {
 		self.machine().params()
@@ -557,8 +559,10 @@ pub trait EthEngine: Engine<::machine::EthereumMachine> {
 	}
 }
 
+impl_downcast!(EthEngine);
+
 // convenience wrappers for existing functions.
-impl<T> EthEngine for T where T: Engine<::machine::EthereumMachine> { }
+impl<T: 'static> EthEngine for T where T: Engine<::machine::EthereumMachine> { }
 
 /// Verifier for all blocks within an epoch with self-contained state.
 pub trait EpochVerifier<M: machine::Machine>: Send + Sync {

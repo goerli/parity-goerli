@@ -16,6 +16,9 @@
 
 //! Engine-specific types.
 
+use ethereum_types::{H256, Address};
+use std::collections::{HashSet, BTreeMap};
+
 pub mod epoch;
 
 /// Fork choice.
@@ -25,4 +28,41 @@ pub enum ForkChoice {
 	New,
 	/// Choose the current best block.
 	Old,
+}
+
+// Vote (clique)
+pub struct Vote {
+	/// The address that is signing this vote
+	pub signer: Address,
+	/// Block number where the vote was casted
+	pub block: u64,
+	/// Address being voted to change its authorization
+	pub address: Address,
+	/// Indicates if the vote will authorize or not
+	pub authorize: bool,
+}
+
+/// Vote Tally for a certain block
+pub struct Tally {
+	/// Indicates if the vote authorizes or bans
+	pub authorize: bool,
+	/// Number of votes
+	pub votes: u64,
+}
+
+/// Clique Snapshot for a certain block
+pub struct Snapshot {
+	/// Block number
+	pub number : u64,
+	/// Block hash
+	pub hash: H256,
+	/// Authorized Signers
+	pub signers: HashSet<Address>,
+	/// Recent Signers (spam protection)
+	//FIXME: send a PR to Geth to correct the API typo (recents vs recent)
+	pub recents: BTreeMap<u64, Address>,
+	/// List of votes (chronologically sorted)
+	pub votes: Vec<Vote>,
+	/// Vote tally
+	pub tally: BTreeMap<Address, Tally>,
 }

@@ -42,11 +42,11 @@ pub struct VoteState {
 /// Type that represent a vote
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
 pub struct Vote {
-	block_number: BlockNumber,
-	beneficiary: Address,
-	kind: VoteType,
-	signer: Address,
-	reverted: bool,
+	pub block_number: BlockNumber,
+	pub beneficiary: Address,
+	pub kind: VoteType,
+	pub signer: Address,
+	pub reverted: bool,
 }
 
 /// Type that represent a pending vote
@@ -123,6 +123,18 @@ impl CliqueBlockState {
 			signers,
 			..Default::default()
 		}
+	}
+
+	pub fn signers(&self) -> &BTreeSet<Address> {
+		&self.signers
+	}
+
+	pub fn recent_signers(&self) -> &VecDeque<Address> {
+		&self.recent_signers
+	}
+
+	pub fn votes(&self) -> Vec<Vote> {
+		unimplemented!()
 	}
 
 	// see https://github.com/ethereum/go-ethereum/blob/master/consensus/clique/clique.go#L474
@@ -306,11 +318,6 @@ impl CliqueBlockState {
 			VoteType::Add => !in_signer,
 			VoteType::Remove => in_signer,
 		}
-	}
-
-	/// Returns the list of current signers
-	pub fn signers(&self) -> &BTreeSet<Address> {
-		&self.signers
 	}
 
 	// Note this method will always return `true` but it is intended for a uniform `API`
