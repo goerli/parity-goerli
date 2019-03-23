@@ -278,6 +278,13 @@ impl Clique {
 				let mut chain: &mut VecDeque<Header> = &mut VecDeque::with_capacity(
 					(header.number() - last_checkpoint_number + 1) as usize);
 
+				// Catching up state, note that we don't really store block state for intermediary blocks,
+				// for speed.
+				let backfill_start = time::Instant::now();
+				trace!(target: "engine",
+						"Back-filling block state. last_checkpoint_number: {}, target: {}({}).",
+						last_checkpoint_number, header.number(), header.hash());
+
 				// Put ourselves in.
 				chain.push_front(header.clone());
 
@@ -300,13 +307,6 @@ impl Clique {
 						}
 					}
 				}
-
-				// Catching up state, note that we don't really store block state for intermediary blocks,
-				// for speed.
-				let backfill_start = time::Instant::now();
-				trace!(target: "engine",
-						"Back-filling block state. last_checkpoint_number: {}, target: {}({}).",
-						last_checkpoint_number, header.number(), header.hash());
 
 				// Get the state for last checkpoint.
 				let last_checkpoint_hash = *chain.front()
