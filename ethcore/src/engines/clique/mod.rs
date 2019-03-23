@@ -346,8 +346,8 @@ impl Clique {
 
 	pub fn get_signers(&self, query: BlockId) -> Result<Vec<Address>, Error> {
 		let header = self.find_header(query)?;
-		let signers = extract_signers(&header)?;
-		let answer: Vec<Address> = signers.iter().map(|x| *x).collect();
+		let state = self.state(&header)?;
+		let answer: Vec<Address> = state.signers.iter().map(|x| *x).collect();
 		Ok(answer)
 	}
 
@@ -510,9 +510,9 @@ impl Engine<EthereumMachine> for Clique {
 
 					// Wait for the right moment.
 					if now < limit {
-						trace!(target: "engine",
-							   "generate_seal: sleeping to sign: inturn: {}, now: {:?}, to: {:?}.",
+						trace!(target: "engine", "generate_seal: sleeping to sign: inturn: {}, now: {:?}, to: {:?}.",
 							   inturn, now, limit);
+
 						match limit.duration_since(SystemTime::now()) {
 							Ok(duration) => {
 								thread::sleep(duration);
